@@ -50,6 +50,8 @@ h1,h2,h3{font-family:var(--f-display);font-weight:500;margin:0;text-wrap:balance
 .circ svg{width:24px;height:24px}
 .top :focus-visible{outline-color:#fff}
 body{overflow-x:clip}
+#sbtint{position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top,0px) + 2px);background:var(--accent);z-index:50;pointer-events:none}
+
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .sub{color:var(--muted);font-size:.875rem}
 .grp{display:flex;flex-direction:column;gap:8px}
@@ -201,6 +203,7 @@ input[type=number],input[type=text],input[type=time],input[type=tel],input[type=
 </style>
 </head>
 <body>
+<div id="sbtint" aria-hidden="true"></div>
 <div class="app" id="app"><div class="empty"><b>กำลังโหลด…</b></div></div>
 <div id="toast" hidden role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
