@@ -55,9 +55,13 @@ body{overflow-x:clip}
 .splash{position:fixed;inset:0;z-index:100;background:var(--accent);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
 .splash img{width:132px;height:132px;display:block}
 .splash b{font-family:var(--f-display);font-weight:500;font-size:1.5rem;letter-spacing:.02em}
-.spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .9s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.6s}}
+.splash.off{opacity:0;visibility:hidden;transition:opacity .25s ease,visibility 0s linear .25s}
+/* Indeterminate loading bar: white track, rust block sliding back and forth. */
+.ld{width:min(48vw,240px);height:7px;border-radius:99px;background:#fff;overflow:hidden;margin-top:36px}
+.ld i{display:block;width:34%;height:100%;border-radius:99px;background:var(--brand2);animation:ldslide 1.1s ease-in-out infinite alternate}
+@keyframes ldslide{from{transform:translateX(0)}to{transform:translateX(194%)}}
+.ldtxt{font-size:1rem;color:#fff;margin-top:-4px}
+@media (prefers-reduced-motion:reduce){.ld i{animation-duration:3s}}
 #sbtint{position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top,0px) + 2px);background:var(--accent);z-index:50;pointer-events:none}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
@@ -212,7 +216,8 @@ input[type=number],input[type=text],input[type=time],input[type=tel],input[type=
 </head>
 <body>
 <div id="sbtint" aria-hidden="true"></div>
-<div class="app" id="app"><div class="splash" role="status" aria-live="polite"><img src="icons/icon-192.png" width="132" height="132" alt=""><b>NNMKP Staff</b><div class="spin" aria-hidden="true"></div></div></div>
+<div id="splash" class="splash" role="status" aria-live="polite"><img src="icons/icon-192.png" width="132" height="132" alt="" decoding="sync"><b>NNMKP Staff</b><div class="ld" aria-hidden="true"><i></i></div><span class="ldtxt">กำลังโหลด…</span></div>
+<div class="app" id="app"></div>
 <div id="toast" hidden role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
@@ -778,12 +783,13 @@ function vMgr(){
 
 /* ---------- render ---------- */
 function ready(){var r=S.ready;return r.staff&&r.off&&r.pay&&r.cfg&&r.adv&&r.loans}
-function vSplash(){return '<div class="splash" role="status" aria-live="polite"><img src="icons/icon-192.png" width="132" height="132" alt=""><b>NNMKP Staff</b><div class="spin" aria-hidden="true"></div></div>'}
+function setSplash(on){var e=document.getElementById('splash');if(e)e.classList.toggle('off',!on)}
 function render(){
-  if(S.fail){$app.innerHTML='<div class="card empty"><b>เปิดหน้านี้ไม่ได้</b>'+esc(S.failMsg||'โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง')+'</div>';return}
-  if(S.booting){$app.innerHTML=vSplash();return}
-  if(!S.session){$app.innerHTML=vLogin();return}
-  if(!ready()){$app.innerHTML=vSplash();return}
+  if(S.fail){setSplash(false);$app.innerHTML='<div class="card empty"><b>เปิดหน้านี้ไม่ได้</b>'+esc(S.failMsg||'โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง')+'</div>';return}
+  if(S.booting){setSplash(true);return}
+  if(!S.session){setSplash(false);$app.innerHTML=vLogin();return}
+  if(!ready()){setSplash(true);return}
+  setSplash(false);
   remember();
   $app.innerHTML=S.session.role==='mgr'?vMgr():vStaff();
   hydrate();
