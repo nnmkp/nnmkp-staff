@@ -216,6 +216,41 @@ input[type=number],input[type=text],input[type=time],input[type=tel],input[type=
 .note{font-size:.8125rem;color:var(--muted)}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));margin-inline:auto;max-width:420px;background:var(--fg);color:var(--bg);border-radius:12px;padding:12px 16px;text-align:center;z-index:5}
 .scroll{overflow-x:auto}
+
+/* ---- Compact density: sizes matched to NNMKP Hub (smaller controls, tighter cards, smaller big numbers). Remove this block to go back to the roomy layout. ---- */
+html{font-size:14.5px}
+body{font-size:15px;padding-inline:20px;padding-block:16px 84px}
+.app{gap:12px}
+.top{padding:calc(14px + env(safe-area-inset-top,0px)) max(20px,calc(50vw - 300px)) 14px}
+.top .who b{font-size:1.3rem}
+.circ{width:40px;height:40px}.circ svg{width:20px;height:20px}
+.card{padding:14px;gap:10px;border-radius:16px}
+.nav button{min-width:40px;min-height:40px;font-size:1.125rem}
+.nav b{font-size:1.0625rem}
+.btn{min-height:44px;padding:8px 16px}
+.btn.sm{min-height:36px;padding:4px 12px}
+.tabs{padding:4px 8px calc(4px + env(safe-area-inset-bottom,0px))}
+.tabs button{min-height:44px;font-size:.875rem}
+.seg{padding:3px}.seg button{min-height:36px}
+.picks{gap:6px}
+.picks button{min-height:38px;padding:4px 14px}
+.picks.one button{min-height:46px;padding:4px 2px}
+.cal{gap:3px}
+.cal button,.cal .blank{min-height:50px}
+.mcal button{min-height:72px}
+input[type=number],input[type=text],input[type=time],input[type=tel],input[type=date],select{min-height:40px;padding:4px 10px}
+.step button{width:40px;height:40px}
+.pad button{min-height:56px;font-size:1.375rem}
+.acct-main{min-height:64px;padding-block:8px}
+.acct-main .av{width:46px;height:46px}.acct-main .av svg{width:24px;height:24px}
+.acct-x{height:64px}
+.tile{min-height:60px;padding:10px 14px}
+.lines .tot dd{font-size:1.25rem}
+.netbox{padding:8px 12px}.netbox b{font-size:1.5rem}
+.accno{font-size:1.25rem}
+.slip .sh{padding:12px 14px}.slip .sh h3{font-size:1.125rem}
+.slip .sb{padding:14px;gap:12px}
+.mou{padding:10px}
 </style>
 </head>
 <body>
@@ -713,7 +748,7 @@ function vPay(){
   var h=navHtml();
   if(!S.staff.length)return h+'<div class="card empty"><b>ยังไม่มีพนักงาน</b>เพิ่มได้ในหน้าตั้งค่า</div>';
   var sel=S.staff.find(function(x){return x.id===S.paystaff})||S.staff[0];
-  h+='<div class="row" role="group" aria-label="เลือกพนักงาน">'+S.staff.map(function(x){return '<button class="btn sm'+(x.id===sel.id?'':' alt')+'" data-act="paystaff" data-id="'+esc(x.id)+'" aria-pressed="'+(x.id===sel.id)+'">'+esc(x.name)+' <span style="opacity:.75;font-weight:400">'+esc(x.branch)+'</span></button>'}).join('')+'</div>';
+  h+='<div class="picks one" role="group" aria-label="เลือกพนักงาน">'+S.staff.map(function(x){return '<button data-act="paystaff" data-id="'+esc(x.id)+'" aria-pressed="'+(x.id===sel.id)+'">'+esc(x.name)+'<small>'+esc(x.branch)+'</small></button>'}).join('')+'</div>';
   [sel].forEach(function(st){
     var c=calc(st,S.ym), id=esc(st.id);
     var items=c.items.map(function(it,i){return '<div class="item"><span>'+esc(it.label)+' · −'+fmt(it.amount)+'</span><button class="btn alt sm" data-act="rmitem" data-id="'+id+'" data-i="'+i+'" aria-label="ลบรายการ">ลบ</button></div>'}).join('');
@@ -729,7 +764,7 @@ function vPay(){
       +'<div class="neg"><dt>เบิกล่วงหน้า</dt><dd>−'+fmt(c.advAmt)+'</dd></div>'
       +'<div class="neg"><dt>รายการหัก</dt><dd>−'+fmt(c.iAmt)+'</dd></div></dl>'
       +'<h3 class="sec">ปรับรายเดือน</h3>'
-      +'<div class="ctl"><div class="cl"><b>สิทธิ์วันหยุด</b><span class="sub">'+aiTxt+' · หยุดไปแล้ว '+c.off+' วัน</span></div><div class="step"><button data-act="adj" data-d="-1" data-id="'+id+'" aria-label="ลดสิทธิ์วันหยุด">−</button><b title="ปรับสิทธิ์">'+(ai.adj>0?'+':'')+ai.adj+'</b><button data-act="adj" data-d="1" data-id="'+id+'" aria-label="เพิ่มสิทธิ์วันหยุด">+</button></div></div>'
+      +'<div class="ctl"><div class="cl"><b>สิทธิ์วันหยุด</b><span class="sub">'+aiTxt+'</span><span class="sub">หยุดไปแล้ว '+c.off+' วัน</span></div><div class="step"><button data-act="adj" data-d="-1" data-id="'+id+'" aria-label="ลดสิทธิ์วันหยุด">−</button><b title="ปรับสิทธิ์">'+(ai.adj>0?'+':'')+ai.adj+'</b><button data-act="adj" data-d="1" data-id="'+id+'" aria-label="เพิ่มสิทธิ์วันหยุด">+</button></div></div>'
       +'<div class="ctl"><div class="cl"><b>ออเดอร์ผิด</b><span class="sub">ครั้งละ '+fmt(c.mrate)+' บาท</span></div><div class="step"><button data-act="mist" data-d="-1" data-id="'+id+'" aria-label="ลด">−</button><b>'+c.mistakes+'</b><button data-act="mist" data-d="1" data-id="'+id+'" aria-label="เพิ่ม">+</button></div></div>'
       +'<div class="ctl"><div class="cl"><label for="ot-'+id+'"><b>OT เพิ่มเติม</b></label><span class="sub">บาท</span></div><input class="amt" id="ot-'+id+'" type="number" inputmode="numeric" min="0" value="'+c.ot+'" data-chg="ot" data-id="'+id+'"></div>'
       +advSection(st)
