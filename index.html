@@ -501,7 +501,8 @@ function notifUnread(n){
 /* ----- Web Push ----- */
 function pushSupported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&!!CFG.vapid}
 function b64u(k){var p='='.repeat((4-k.length%4)%4),b=(k+p).replace(/-/g,'+').replace(/_/g,'/'),r=atob(b),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
-function pushSave(sub){var j=sub.toJSON();return SB.rpc('register_push',{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth})}
+function pushSave(sub){var j=sub.toJSON();return SB.rpc('register_push',{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth}).then(function(r){
+  var m=r&&r.error?(r.error.message||r.error.code||'error'):'';if(m!==(S.pushErr||'')){S.pushErr=m;schedule()}return r})}
 function pushLeave(){
   if(!('serviceWorker' in navigator)||!('PushManager' in window))return Promise.resolve();
   return navigator.serviceWorker.ready.then(function(reg){return reg.pushManager.getSubscription()}).then(function(sub){
@@ -527,7 +528,7 @@ function syncBadge(){
   if(n===0&&S.session.role!=='mgr'&&S.pushOn)SB.from('push_subs').update({badge:0}).neq('endpoint','').then(function(){},function(){})}
 function pushCard(){
   var inApp=window.matchMedia&&matchMedia('(display-mode: standalone)').matches||navigator.standalone;
-  if(S.pushOn)return '<div class="card note">เปิดการแจ้งเตือนบนเครื่องนี้แล้ว ✓</div>';
+  if(S.pushOn)return S.pushErr?'<div class="card"><b>เปิดแล้ว แต่ลงทะเบียนเครื่องนี้ไม่สำเร็จ</b><div class="sub">'+esc(S.pushErr)+'</div><button class="btn alt" data-act="pushre">ลองลงทะเบียนอีกครั้ง</button></div>':'<div class="card note">เปิดการแจ้งเตือนบนเครื่องนี้แล้ว ✓ <button class="btn alt sm" data-act="pushre" style="margin-left:8px">ลงทะเบียนเครื่องใหม่</button></div>';
   var ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
   if(!pushSupported()||(ios&&!inApp))return '<div class="card"><b>เปิดการแจ้งเตือนบนมือถือ</b><div class="sub">'+(ios?'ต้องเพิ่มแอปลงหน้าจอหลักก่อน (Safari → ปุ่มแชร์ → เพิ่มลงในหน้าจอโฮม) แล้วเปิดแอปจากไอคอน ใช้ได้กับ iOS 16.4 ขึ้นไป':'เบราว์เซอร์นี้ยังไม่รองรับ ให้ใช้ Chrome แล้วเลือก ติดตั้งแอป / เพิ่มลงหน้าจอหลัก')+'</div></div>';
   if(S.pushDenied||Notification.permission==='denied')return '<div class="card"><b>การแจ้งเตือนถูกปิดอยู่</b><div class="sub">เปิดได้ที่ ตั้งค่า (Settings) ของ iPhone → แจ้งเตือน → NNMKP Staff</div></div>';
@@ -1094,6 +1095,7 @@ document.addEventListener('click',function(e){
     case 'logout':pushLeave().then(function(){return SB.auth.signOut()}).then(function(){location.reload()},function(){location.reload()});break;
     case 'tab':S.tab=d.t;S.notif=false;render();break;
     case 'pushon':pushEnable();break;
+    case 'pushre':pushRefresh();toast('กำลังลงทะเบียนเครื่องนี้ใหม่');break;
     case 'bell':if(S.notif){S.notif=false}else{S.nprev=getSeen();setSeen(Date.now());S.notif=true}render();break;
     case 'nopen':S.tab=d.t;S.notif=false;render();break;
     case 'ym':{var p=S.ym.split('-').map(Number);var n=new Date(p[0],p[1]-1+Number(d.d),1);S.ym=n.getFullYear()+'-'+pad(n.getMonth()+1);S.sel=null;S.msel=null;render();break}
