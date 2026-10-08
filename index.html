@@ -493,10 +493,40 @@ function notifUnread(n){
   if(S.session&&S.session.role==='mgr')return n.length;
   var seen=getSeen();return n.filter(function(x){return x.at>seen}).length;
 }
+/* ----- Web Push ----- */
+function pushSupported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&!!CFG.vapid}
+function b64u(k){var p='='.repeat((4-k.length%4)%4),b=(k+p).replace(/-/g,'+').replace(/_/g,'/'),r=atob(b),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
+function pushSave(sub){var j=sub.toJSON();return SB.auth.getUser().then(function(u){var uid=u.data&&u.data.user&&u.data.user.id;if(!uid)return;
+  return SB.from('push_subs').upsert({endpoint:j.endpoint,user_id:uid,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'endpoint'})})}
+function pushRefresh(){
+  if(!pushSupported()||!S.session)return;
+  navigator.serviceWorker.ready.then(function(reg){return reg.pushManager.getSubscription()}).then(function(sub){
+    var on=!!sub&&Notification.permission==='granted';if(on!==!!S.pushOn){S.pushOn=on;schedule()}
+    if(sub&&on)pushSave(sub)}).catch(function(){})}
+function pushEnable(){
+  if(!pushSupported()){toast('เครื่องนี้ยังไม่รองรับ ต้องเพิ่มแอปลงหน้าจอหลักก่อน');return}
+  Notification.requestPermission().then(function(p){
+    if(p!=='granted'){toast('ไม่ได้อนุญาตการแจ้งเตือน เปิดได้ที่ ตั้งค่า > แจ้งเตือน');S.pushDenied=true;render();return}
+    return navigator.serviceWorker.ready.then(function(reg){return reg.pushManager.getSubscription().then(function(s){return s||reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(CFG.vapid)})})})
+      .then(function(sub){return pushSave(sub)}).then(function(){S.pushOn=true;toast('เปิดการแจ้งเตือนแล้ว');render()})
+  }).catch(function(e){toast('เปิดการแจ้งเตือนไม่สำเร็จ');try{console.error(e)}catch(_){}})}
+var lastBadge=-1;
+function syncBadge(){
+  if(!S.session||!ready()||!('setAppBadge' in navigator))return;
+  var n=notifUnread(notifs());if(S.notif&&S.session.role!=='mgr')n=0;
+  if(n===lastBadge)return;lastBadge=n;
+  try{(n>0?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(function(){})}catch(e){}
+  if(n===0&&S.session.role!=='mgr'&&S.pushOn)SB.from('push_subs').update({badge:0}).neq('endpoint','').then(function(){},function(){})}
+function pushCard(){
+  var inApp=window.matchMedia&&matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  if(S.pushOn)return '<div class="card note">เปิดการแจ้งเตือนบนเครื่องนี้แล้ว ✓</div>';
+  if(!pushSupported()||!inApp)return '<div class="card"><b>เปิดการแจ้งเตือนบนมือถือ</b><div class="sub">ต้องเพิ่มแอปลงหน้าจอหลักก่อน (Safari → ปุ่มแชร์ → เพิ่มลงในหน้าจอโฮม) แล้วเปิดแอปจากไอคอน ใช้ได้กับ iOS 16.4 ขึ้นไป</div></div>';
+  if(S.pushDenied||Notification.permission==='denied')return '<div class="card"><b>การแจ้งเตือนถูกปิดอยู่</b><div class="sub">เปิดได้ที่ ตั้งค่า (Settings) ของ iPhone → แจ้งเตือน → NNMKP Staff</div></div>';
+  return '<div class="card"><b>รับแจ้งเตือนแม้ปิดแอป</b><div class="sub">แจ้งเตือนเด้งที่หน้าจอ และมีเลขแดงที่ไอคอนแอป</div><button class="btn" data-act="pushon">เปิดการแจ้งเตือน</button></div>'}
 function agoTxt(t){if(!t)return '';var m=Math.round((Date.now()-t)/6e4);if(m<1)return 'เมื่อสักครู่';if(m<60)return m+' นาทีที่แล้ว';var h=Math.round(m/60);if(h<24)return h+' ชั่วโมงที่แล้ว';var d=new Date(t);return d.getDate()+' '+TH_M[d.getMonth()]}
 function vNotif(){
   var n=notifs(), mgr=S.session.role==='mgr', seen=S.nprev||0;
-  var h='<div class="grp"><h2>การแจ้งเตือน</h2>';
+  var h=pushCard()+'<div class="grp"><h2>การแจ้งเตือน</h2>';
   if(!n.length)return h+'<div class="card empty"><b>ยังไม่มีการแจ้งเตือน</b>'+(mgr?'เมื่อพนักงานขอหยุดหรือขอเบิกเงิน จะขึ้นที่นี่':'เมื่อมีการอนุมัติหรือโอนเงิน จะขึ้นที่นี่')+'</div></div>';
   h+='<div class="nlist">'+n.map(function(x){var fresh=mgr||x.at>seen;
     return '<button class="nitem'+(fresh?' fresh':'')+(x.bad?' bad':'')+'" data-act="nopen" data-t="'+x.tab+'"><span class="nic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(TABICO[x.ico]||'')+'</svg></span><span class="ntx"><b>'+esc(x.title)+'</b><span>'+esc(x.body)+'</span><small>'+esc(agoTxt(x.at))+'</small></span>'+(fresh?'<i class="ndot"></i>':'')+'</button>'}).join('')+'</div></div>';
@@ -965,9 +995,14 @@ function render(){
   if(!ready()){setSplash(true);return}
   setSplash(false);
   remember();
+  if(!S._tp){S._tp=1;try{var tq=new URLSearchParams(location.search).get('tab');if(tq)gotoTab(tq)}catch(e){}}
+  if(!S._pr){S._pr=1;pushRefresh()}
   $app.innerHTML=S.session.role==='mgr'?vMgr():vStaff();
   hydrate();
+  syncBadge();
 }
+function gotoTab(t){var ok=S.session&&(S.session.role==='mgr'?['req','sched','pay','set']:['cal','adv','slip']);if(ok&&ok.indexOf(t)>=0){S.tab=t;S.notif=false;render()}}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.tab)gotoTab(e.data.tab)});
 function hydrate(){document.querySelectorAll('img[data-sp]').forEach(function(im){if(im.getAttribute('src')||!ASSETS)return;ASSETS.signed(im.dataset.sp).then(function(u){im.src=u}).catch(function(){})})}
 function editing(){var a=document.activeElement;return a&&$app.contains(a)&&(a.tagName==='INPUT'||a.tagName==='SELECT')}
 function schedule(){if(editing()){S.dirty=true}else render()}
@@ -1048,6 +1083,7 @@ document.addEventListener('click',function(e){
     case 'pinback':S.pin=S.pin.slice(0,-1);render();break;
     case 'logout':SB.auth.signOut().then(function(){location.reload()},function(){location.reload()});break;
     case 'tab':S.tab=d.t;S.notif=false;render();break;
+    case 'pushon':pushEnable();break;
     case 'bell':if(S.notif){S.notif=false}else{S.nprev=getSeen();setSeen(Date.now());S.notif=true}render();break;
     case 'nopen':S.tab=d.t;S.notif=false;render();break;
     case 'ym':{var p=S.ym.split('-').map(Number);var n=new Date(p[0],p[1]-1+Number(d.d),1);S.ym=n.getFullYear()+'-'+pad(n.getMonth()+1);S.sel=null;S.msel=null;render();break}
