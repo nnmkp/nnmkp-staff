@@ -277,6 +277,11 @@ input,select,textarea{font-size:16px!important}
 .lgrid .big b{font-size:1.375rem;color:#973b20}
 .lhist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px;font-size:.8125rem;color:var(--muted)}
 .lhist li{display:flex;justify-content:space-between;gap:8px}
+.pair{display:flex;flex-direction:column;gap:0;width:100%;min-width:0}
+.pair .chip:first-child{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.pair .chip.ot{border-top-left-radius:0;border-top-right-radius:0;overflow:visible;text-overflow:clip;padding:0 2px;text-align:center}
+.pair .chip:first-child{text-align:center}
+.mcal .chip{overflow:visible;text-overflow:clip;padding:0 2px;text-align:center;letter-spacing:-.01em}
 </style>
 </head>
 <body>
@@ -682,8 +687,9 @@ function vSchedCal(){
   for(var d=1;d<=days;d++){
     var ds=dstr(y,m,d), chips='', mo0=ps&&offOf(ps.id,ds), mine=mo0&&mo0.status==='approved';
     S.staff.forEach(function(s){var o=offOf(s.id,ds);if(!o||o.status==='rejected')return;
-      chips+='<span class="chip '+(s.branch==='SPK'?'spk':'twn')+(o.status==='pending'?' pend':'')+'">'+esc(s.name)+'</span>';
-      if(o.status==='approved'){var cid=coverOf(o),mt=cid&&staffById(cid);if(mt)chips+='<span class="chip ot">OT '+esc(mt.name)+'</span>'}});
+      var oc='<span class="chip '+(s.branch==='SPK'?'spk':'twn')+(o.status==='pending'?' pend':'')+'">'+esc(s.name)+'</span>',cc='';
+      if(o.status==='approved'){var cid=coverOf(o),mt=cid&&staffById(cid);if(mt)cc='<span class="chip ot" title="OT ทำแทน">'+esc(mt.name)+'</span>'}
+      chips+=cc?'<span class="pair">'+oc+cc+'</span>':oc});
     h+='<button class="'+(ds===today?'today':'')+(!ps&&ds===S.msel?' sel':'')+(mine?' mine':'')+'" data-act="mseldate" data-d="'+ds+'"><span class="d">'+d+'</span>'+chips+'</button>';
   }
   h+='</div><div class="legend"><span><span class="chip spk">SPK</span></span><span><span class="chip twn">TWN</span></span><span><span class="chip spk pend">รออนุมัติ</span></span><span><span class="chip ot">OT ทำแทน</span></span></div>';
