@@ -810,7 +810,7 @@ function vPay(){
     var c=calc(st,S.ym), id=esc(st.id);
     var items=c.items.map(function(it,i){return '<div class="item"><span>'+esc(it.label)+' · −'+fmt(it.amount)+'</span><button class="btn alt sm" data-act="rmitem" data-id="'+id+'" data-i="'+i+'" aria-label="ลบรายการ">ลบ</button></div>'}).join('');
     var ai=c.ai, aiTxt='สิทธิ์เดือนนี้ <b>'+ai.eff+' วัน</b>'+(ai.carry?' <span class="sub">(เดือนก่อนหยุดเกิน '+(-ai.carry)+')</span>':'');
-    h+='<section class="card"><div class="ch"><div><div class="nm">'+esc(st.name)+'</div><div class="sub">'+esc(st.branch)+' · เงินเดือน ฿'+fmt(c.base)+'</div></div>'+(c.published?'<span class="pill ok">เผยแพร่แล้ว</span>':'<span class="pill">ยังไม่เผยแพร่</span>')+'</div>'
+    h+='<section class="card"><div class="ch"><div><div class="nm">'+esc(st.name)+'</div><div class="sub">'+esc(st.branch)+' · เงินเดือน ฿'+fmt(c.base)+'</div></div>'+(c.published?'<span class="pill ok">อนุมัติแล้ว</span>':'<span class="pill">ยังไม่อนุมัติ</span>')+'</div>'
       +'<div class="netbox"><span>ยอดสุทธิ</span><b>฿'+fmt(c.net)+'</b></div>'
       +bankBox(st,c.net)
       +'<dl class="lines"><div><dt>เงินเดือน</dt><dd>'+fmt(c.base)+'</dd></div>'
@@ -832,7 +832,7 @@ function vPay(){
       +'<div class="addrow"><select id="lb-'+id+'" aria-label="ประเภท"><option>ค่าทำ MOU</option><option>ค่าวีซ่า</option><option>อื่นๆ</option></select>'
       +'<input id="am-'+id+'" type="number" inputmode="numeric" min="0" placeholder="บาท" aria-label="จำนวน (บาท)"><button class="btn alt sm" data-act="additem" data-id="'+id+'">เพิ่ม</button></div>'
       +proofHtml(st.id,S.ym,true)
-      +(c.published?'<button class="btn alt" data-act="unpublish" data-id="'+id+'">ยกเลิกการเผยแพร่</button>':'<button class="btn" data-act="publish" data-id="'+id+'">เผยแพร่สลิปให้'+esc(st.name)+'</button>')
+      +(c.published?'<button class="btn alt" data-act="unpublish" data-id="'+id+'">ยกเลิกการอนุมัติ</button>':'<button class="btn" data-act="publish" data-id="'+id+'">อนุมัติสลิปให้'+esc(st.name)+'</button>')
       +'</section>';
   });
   return h;
@@ -1051,7 +1051,7 @@ document.addEventListener('click',function(e){
     case 'rmitem':{var s6=staffById(d.id),c6=calc(s6,S.ym);patchPay(S.ym,d.id,{items:c6.items.filter(function(_,i){return i!==Number(d.i)})});break}
     case 'publish':{
       var s7=staffById(d.id), c7=calc(s7,S.ym), m7=mouInfo(s7,S.ym);
-      patchPay(S.ym,d.id,{published:true,slip:{allowance:c7.allowance,carry:c7.ai.carry,adj:c7.ai.adj,offDates:S.off.filter(function(o){return o.staffId===d.id&&o.status==='approved'&&o.date.indexOf(S.ym)===0}).map(function(o){return o.date}).sort(),base:c7.base,extraDays:c7.extraDays,rate:c7.rate,extra:c7.extra,ot:c7.ot,coverDates:c7.coverDates,coverRate:c7.coverRate,coverAmt:c7.coverAmt,mouTotal:m7?m7.total:0,mouLeft:m7?m7.left:0,mistakes:c7.mistakes,mrate:c7.mrate,mAmt:c7.mAmt,items:c7.items,adv:c7.adv,advAmt:c7.advAmt,loans:S.loans.filter(function(l){return l.staffId===d.id}).map(function(l){var li=loanInfo(l,S.ym);return {label:l.label,left:li.left,total:li.total}}).filter(function(x){return x.total>0}),net:c7.net,at:Date.now()}}).then(function(){toast('เผยแพร่สลิปให้'+s7.name+'แล้ว')});break}
+      patchPay(S.ym,d.id,{published:true,slip:{allowance:c7.allowance,carry:c7.ai.carry,adj:c7.ai.adj,offDates:S.off.filter(function(o){return o.staffId===d.id&&o.status==='approved'&&o.date.indexOf(S.ym)===0}).map(function(o){return o.date}).sort(),base:c7.base,extraDays:c7.extraDays,rate:c7.rate,extra:c7.extra,ot:c7.ot,coverDates:c7.coverDates,coverRate:c7.coverRate,coverAmt:c7.coverAmt,mouTotal:m7?m7.total:0,mouLeft:m7?m7.left:0,mistakes:c7.mistakes,mrate:c7.mrate,mAmt:c7.mAmt,items:c7.items,adv:c7.adv,advAmt:c7.advAmt,loans:S.loans.filter(function(l){return l.staffId===d.id}).map(function(l){var li=loanInfo(l,S.ym);return {label:l.label,left:li.left,total:li.total}}).filter(function(x){return x.total>0}),net:c7.net,at:Date.now()}}).then(function(){toast('อนุมัติสลิปให้'+s7.name+'แล้ว')});break}
     case 'unpublish':{patchPay(S.ym,d.id,{published:false,slip:null});break}
     case 'addstaff':{
       var nm=document.getElementById('n-name').value.trim(), pin=document.getElementById('n-pin').value.trim(), base=Number(document.getElementById('n-base').value), phn=document.getElementById('n-phone').value.replace(/\D/g,'');
