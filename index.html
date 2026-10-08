@@ -573,25 +573,28 @@ function advSection(st){
     +'<div class="addrow"><input id="aa-'+id+'" type="number" inputmode="numeric" min="0" placeholder="บาท" value="'+esc((S.aamt||{})[st.id]||'')+'" aria-label="จำนวนเงินที่เบิก"><input id="ad-'+id+'" type="date" value="'+esc(advDate())+'" aria-label="วันที่เบิก"><button class="btn alt sm" data-act="advadd" data-id="'+id+'">บันทึกเบิก</button></div>'
     +'<div class="note">บันทึกเองจะอนุมัติทันที (ใช้กับเบิกที่ตกลงกันไว้ก่อน) กฎปกติ: เบิกได้ตั้งแต่วันที่ '+cfg.advFrom+' ไม่เกิน ฿'+fmt(cfg.advMax)+'/เดือน</div>';
 }
+function debtCard(o){
+  var total=o.total,left=o.left,paid=Math.max(0,total-left),pct=total?Math.min(100,Math.round(paid*100/total)):0,done=left<=0;
+  var months=o.monthly>0?Math.ceil(left/o.monthly):0;
+  return '<div class="card"><div class="ch"><div><b>'+esc(o.label)+'</b><div class="sub">'+o.sub+'</div></div>'+(done?'<span class="pill ok">ชำระครบแล้ว</span>':'')+'</div>'
+    +'<div class="lbar'+(done?' done':'')+'" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'
+    +'<div class="lgrid"><div class="big"><small>ยอดคงเหลือที่ต้องคืน</small><b>฿'+fmt(left)+'</b></div>'
+    +'<div><small>'+o.totalLbl+'</small><b>฿'+fmt(total)+'</b></div><div><small>คืนแล้ว ('+pct+'%)</small><b>฿'+fmt(paid)+'</b></div>'
+    +(done||!o.monthly?'':'<div><small>หักเดือนละ</small><b>฿'+fmt(o.monthly)+'</b></div><div><small>อีกประมาณ</small><b>'+months+' เดือน</b></div>')+'</div>'
+    +(o.hist.length?'<ul class="lhist">'+o.hist.slice(0,4).map(function(x){return '<li><span>หักในสลิป'+esc(ymLabel(x.ym))+'</span><span>−฿'+fmt(x.amount)+'</span></li>'}).join('')+'</ul>':'')+'</div>';
+}
+function debtHist(st,test){var hist=[];
+  Object.keys(S.pay).forEach(function(k){var p=S.pay[k]; if(!p||p.staffId!==st.id)return;(p.items||[]).forEach(function(i){if(test(i))hist.push({ym:p.ym,amount:+i.amount||0})})});
+  return hist.sort(function(a,b){return a.ym<b.ym?1:-1});}
 function loanCards(st){
-  var list=S.loans.filter(function(l){return l.staffId===st.id});
-  if(!list.length)return '';
-  var h='<div class="grp"><h2>เงินยืม / ผ่อนชำระ</h2>';
-  list.forEach(function(l){
-    var m=loanInfo(l,S.ym), total=m.total, left=m.left, paid=Math.max(0,total-left), pct=total?Math.min(100,Math.round(paid*100/total)):0;
-    var mo=+l.monthly||0, months=mo>0?Math.ceil(left/mo):0, done=left<=0;
-    var hist=[];
-    Object.keys(S.pay).forEach(function(k){var p=S.pay[k]; if(!p||p.staffId!==st.id)return;(p.items||[]).forEach(function(i){if(i.loan===l.id)hist.push({ym:p.ym,amount:+i.amount||0})})});
-    hist.sort(function(a,b){return a.ym<b.ym?1:-1});
-    h+='<div class="card"><div class="ch"><div><b>'+esc(l.label)+'</b><div class="sub">ยืมเมื่อ '+esc(dateShort(l.date))+' · หักเดือนละ ฿'+fmt(mo)+'</div></div>'+(done?'<span class="pill ok">ชำระครบแล้ว</span>':'')+'</div>'
-      +'<div class="lbar'+(done?' done':'')+'" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'
-      +'<div class="lgrid"><div class="big"><small>ยอดคงเหลือที่ต้องคืน</small><b>฿'+fmt(left)+'</b></div>'
-      +'<div><small>เงินต้นที่ยืม</small><b>฿'+fmt(total)+'</b></div><div><small>คืนแล้ว ('+pct+'%)</small><b>฿'+fmt(paid)+'</b></div>'
-      +(done?'':'<div><small>เริ่มหัก</small><b>'+esc(ymLabel(l.start))+'</b></div><div><small>อีกประมาณ</small><b>'+months+' เดือน</b></div>')+'</div>'
-      +(hist.length?'<ul class="lhist">'+hist.slice(0,4).map(function(x){return '<li><span>หักในสลิป'+esc(ymLabel(x.ym))+'</span><span>−฿'+fmt(x.amount)+'</span></li>'}).join('')+'</ul>':'')
-      +'</div>';
-  });
-  return h+'</div>';
+  var cards='';
+  var mi=mouInfo(st,S.ym);
+  if(mi){var plan=mi.plan||0;
+    cards+=debtCard({label:'ค่าทำ MOU',sub:'หักตามแผนรายเดือน'+(plan?' · เดือนนี้ ฿'+fmt(plan):''),total:mi.total,left:mi.left,monthly:plan,totalLbl:'ยอด MOU ทั้งหมด',hist:debtHist(st,function(i){return i.mou})});}
+  S.loans.filter(function(l){return l.staffId===st.id}).forEach(function(l){
+    var m=loanInfo(l,S.ym);
+    cards+=debtCard({label:l.label,sub:'ยืมเมื่อ '+esc(dateShort(l.date))+' · เริ่มหัก '+esc(ymLabel(l.start)),total:m.total,left:m.left,monthly:+l.monthly||0,totalLbl:'เงินต้นที่ยืม',hist:debtHist(st,function(i){return i.loan===l.id})});});
+  return cards?'<div class="grp"><h2>เงินยืม / ผ่อนชำระ</h2>'+cards+'</div>':'';
 }
 function vAdv(st){
   var cfg=C(), now=new Date(), ym=now.getFullYear()+'-'+pad(now.getMonth()+1), day=now.getDate();
