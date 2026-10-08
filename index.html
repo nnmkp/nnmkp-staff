@@ -264,6 +264,19 @@ input[type=number],input[type=text],input[type=time],input[type=tel],input[type=
 html,body,button,a,input,select,label,.pad,.pad *{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 button,.pad{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,select,textarea{font-size:16px!important}
+/* loan progress (staff เบิกเงิน tab) */
+.lbar{height:10px;border-radius:99px;background:var(--line,#f0dcb0);overflow:hidden}
+.lbar i{display:block;height:100%;border-radius:99px;background:var(--orange,#f79922)}
+.lbar.done i{background:#3f9a5b}
+.ch .pill{white-space:nowrap;flex:none}
+.lgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lgrid>div{background:#fff8e8;border:1px solid #f0dcb0;border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.lgrid small{color:var(--muted);font-size:.75rem}
+.lgrid b{font-size:1.0625rem}
+.lgrid .big{grid-column:1/-1;background:#fff3d9}
+.lgrid .big b{font-size:1.375rem;color:#973b20}
+.lhist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px;font-size:.8125rem;color:var(--muted)}
+.lhist li{display:flex;justify-content:space-between;gap:8px}
 </style>
 </head>
 <body>
@@ -560,6 +573,26 @@ function advSection(st){
     +'<div class="addrow"><input id="aa-'+id+'" type="number" inputmode="numeric" min="0" placeholder="บาท" value="'+esc((S.aamt||{})[st.id]||'')+'" aria-label="จำนวนเงินที่เบิก"><input id="ad-'+id+'" type="date" value="'+esc(advDate())+'" aria-label="วันที่เบิก"><button class="btn alt sm" data-act="advadd" data-id="'+id+'">บันทึกเบิก</button></div>'
     +'<div class="note">บันทึกเองจะอนุมัติทันที (ใช้กับเบิกที่ตกลงกันไว้ก่อน) กฎปกติ: เบิกได้ตั้งแต่วันที่ '+cfg.advFrom+' ไม่เกิน ฿'+fmt(cfg.advMax)+'/เดือน</div>';
 }
+function loanCards(st){
+  var list=S.loans.filter(function(l){return l.staffId===st.id});
+  if(!list.length)return '';
+  var h='<div class="grp"><h2>เงินยืม / ผ่อนชำระ</h2>';
+  list.forEach(function(l){
+    var m=loanInfo(l,S.ym), total=m.total, left=m.left, paid=Math.max(0,total-left), pct=total?Math.min(100,Math.round(paid*100/total)):0;
+    var mo=+l.monthly||0, months=mo>0?Math.ceil(left/mo):0, done=left<=0;
+    var hist=[];
+    Object.keys(S.pay).forEach(function(k){var p=S.pay[k]; if(!p||p.staffId!==st.id)return;(p.items||[]).forEach(function(i){if(i.loan===l.id)hist.push({ym:p.ym,amount:+i.amount||0})})});
+    hist.sort(function(a,b){return a.ym<b.ym?1:-1});
+    h+='<div class="card"><div class="ch"><div><b>'+esc(l.label)+'</b><div class="sub">ยืมเมื่อ '+esc(dateShort(l.date))+' · หักเดือนละ ฿'+fmt(mo)+'</div></div>'+(done?'<span class="pill ok">ชำระครบแล้ว</span>':'')+'</div>'
+      +'<div class="lbar'+(done?' done':'')+'" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'
+      +'<div class="lgrid"><div class="big"><small>ยอดคงเหลือที่ต้องคืน</small><b>฿'+fmt(left)+'</b></div>'
+      +'<div><small>เงินต้นที่ยืม</small><b>฿'+fmt(total)+'</b></div><div><small>คืนแล้ว ('+pct+'%)</small><b>฿'+fmt(paid)+'</b></div>'
+      +(done?'':'<div><small>เริ่มหัก</small><b>'+esc(ymLabel(l.start))+'</b></div><div><small>อีกประมาณ</small><b>'+months+' เดือน</b></div>')+'</div>'
+      +(hist.length?'<ul class="lhist">'+hist.slice(0,4).map(function(x){return '<li><span>หักในสลิป'+esc(ymLabel(x.ym))+'</span><span>−฿'+fmt(x.amount)+'</span></li>'}).join('')+'</ul>':'')
+      +'</div>';
+  });
+  return h+'</div>';
+}
 function vAdv(st){
   var cfg=C(), now=new Date(), ym=now.getFullYear()+'-'+pad(now.getMonth()+1), day=now.getDate();
   var used=advUsed(st.id,ym), left=Math.max(0,cfg.advMax-used), h='';
@@ -575,6 +608,7 @@ function vAdv(st){
       +'<button class="btn" data-act="advreq"'+(S.apick?'':' disabled')+'>'+(S.apick?'ขอเบิก ฿'+fmt(S.apick):'เลือกจำนวนเงินก่อน')+'</button>';
   }
   h+='</section>';
+  h+=loanCards(st);
   var mine=S.adv.filter(function(a){return a.staffId===st.id}).sort(function(a,b){return a.at<b.at?1:-1});
   h+='<div class="grp"><h2>ประวัติการเบิก</h2>';
   if(!mine.length)h+='<div class="note">ยังไม่มี</div>';
