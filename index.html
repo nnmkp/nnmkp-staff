@@ -328,7 +328,7 @@ function vLogin(){
     var dots='';for(var i=0;i<6;i++)dots+='<i class="'+(i<S.pin.length?'on':'')+'"></i>';
     var keys='';[1,2,3,4,5,6,7,8,9].forEach(function(k){keys+='<button data-act="pin" data-k="'+k+'">'+k+'</button>'});
     keys+='<button class="fn" data-act="pickback">กลับ</button><button data-act="pin" data-k="0">0</button><button class="fn" data-act="pinback" aria-label="ลบ">ลบ</button>';
-    return h+'<div class="card"><h1>'+esc(S.pick.name||S.pick.phone)+'</h1><div class="sub" style="margin-top:-8px">กดรหัส PIN 6 หลัก</div><div class="dots" aria-label="รหัสที่กดแล้ว '+S.pin.length+' หลัก">'+dots+'</div><div class="pad">'+keys+'</div></div>';
+    return h+'<div class="card"><h1>'+esc(S.pick.name||S.pick.phone)+'</h1><div class="sub" style="margin-top:-8px">กดรหัส PIN 6 หลัก</div><div class="dots" aria-label="รหัสที่กดแล้ว '+S.pin.length+' หลัก">'+dots+'</div><div class="pad">'+keys+'</div>'+(S.pick.mgr?'<button class="btn alt" data-act="mgrpw" style="margin-top:12px">ใช้อีเมลและรหัสผ่านแทน</button>':'')+'</div>';
   }
   var mem=memAccts(), mg=memMgr();
   if(S.loginMode==='mgr'){
@@ -743,7 +743,8 @@ function vPay(){
 }
 
 function vSet(){
-  var c=C(), h='<section class="card"><h3>กติกาเงินเดือน</h3><div class="two">'
+  var c=C(), h='<section class="card"><h3>PIN เข้าสู่ระบบของผู้จัดการ</h3><div class="sub">ตั้ง PIN 6 หลักเพื่อเข้าแอปด้วยปุ่มตัวเลขเหมือนพนักงาน (แทนรหัสผ่านเดิม)</div><div class="two"><div class="fld"><label for="mp1">PIN ใหม่ (6 หลัก)</label><input id="mp1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></div><div class="fld"><label for="mp2">ยืนยัน PIN</label><input id="mp2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></div></div><button class="btn" data-act="setmgrpin">ตั้ง PIN ผู้จัดการ</button></section>'
+   +'<section class="card"><h3>กติกาเงินเดือน</h3><div class="two">'
     +'<div class="fld"><label for="c-al">สิทธิ์วันหยุดต่อเดือน (วัน)</label><input id="c-al" type="number" inputmode="numeric" min="0" value="'+c.allowance+'" data-chg="cfg" data-f="allowance"></div>'
     +'<div class="fld"><label for="c-ex">ค่าวันหยุดที่ไม่ได้ใช้ (บาท/วัน)</label><input id="c-ex" type="number" inputmode="numeric" min="0" value="'+c.extraRate+'" data-chg="cfg" data-f="extraRate"></div>'
     +'<div class="fld"><label for="c-ot">OT ทำแทน (บาท/วันที่ทำแทน)</label><input id="c-ot" type="number" inputmode="numeric" min="0" value="'+c.otRate+'" data-chg="cfg" data-f="otRate"></div>'
@@ -844,9 +845,9 @@ function enterSession(user){
   });
 }
 function afterPin(){
-  var email=S.pick.phone+'@staff.nnmkp.example.com', pin=S.pin;
+  var email=S.pick.mgr?S.pick.email:S.pick.phone+'@staff.nnmkp.example.com', pin=S.pin;
   SB.auth.signInWithPassword({email:email,password:pin}).then(function(r){
-    if(r.error||!r.data||!r.data.user){toast('เบอร์หรือ PIN ไม่ถูกต้อง');S.pin='';render();return}
+    if(r.error||!r.data||!r.data.user){toast(S.pick&&S.pick.mgr?'PIN ไม่ถูกต้อง (ถ้ายังไม่เคยตั้ง PIN ให้ใช้รหัสผ่านแทน)':'เบอร์หรือ PIN ไม่ถูกต้อง');S.pin='';render();return}
     return enterSession(r.data.user);
   }).catch(function(){toast('เข้าสู่ระบบไม่สำเร็จ ลองอีกครั้ง');S.pin='';render()});
 }
@@ -861,7 +862,8 @@ document.addEventListener('click',function(e){
     case 'addacct':S.loginMode='phone';render();break;
     case 'acctback':S.loginMode='';render();break;
     case 'mgrlogin':S.loginMode='mgr';render();break;
-    case 'mgrpick':S.loginMode='mgr';render();setTimeout(function(){var i=document.getElementById('m-pw');if(i)i.focus()},50);break;
+    case 'mgrpick':S.loginMode='';S.pick={mgr:true,email:memMgr(),name:'ผู้จัดการ'};S.pin='';render();break;
+    case 'mgrpw':S.pick=null;S.pin='';S.loginMode='mgr';render();break;
     case 'mgrforget':setMgr('');render();break;
     case 'phonenext':{var dg=String(document.getElementById('login-phone').value).replace(/\D/g,'');
       if(dg.length<9||dg.length>10){toast('ใส่เบอร์โทร 10 หลัก');break}
@@ -962,6 +964,14 @@ document.addEventListener('click',function(e){
       var tm=sh==='morning'?['08:00','19:30']:(br==='SPK'?['10:30','21:00']:['10:00','21:30']);
       var nid='s'+Date.now().toString(36);
       save('staff/'+nid,{name:nm,branch:br,shift:sh,start:tm[0],end:tm[1],base:base,phone:phn,ord:S.staff.length+1}).then(function(){return callFn({staffId:nid,phone:phn,pin:pin})}).then(function(){toast('เพิ่มพนักงานแล้ว')}).catch(function(e){toast((e&&e.message)||'สร้างบัญชีไม่สำเร็จ')});break}
+    case 'setmgrpin':{var q1=document.getElementById('mp1').value.trim(),q2=document.getElementById('mp2').value.trim();
+      if(!/^\d{6}$/.test(q1)){toast('PIN ต้องเป็นเลข 6 หลัก');break}
+      if(q1!==q2){toast('PIN สองช่องไม่ตรงกัน');break}
+      if(/^(\d)\1{5}$/.test(q1)||q1==='123456'||q1==='654321'||q1==='012345'){toast('PIN เดาง่ายเกินไป ลองเลขอื่น');break}
+      SB.auth.updateUser({password:q1}).then(function(r){
+        if(r.error){toast(/reauth|recent/i.test(r.error.message||'')?'ต้องเข้าสู่ระบบใหม่ก่อนจึงเปลี่ยน PIN ได้':(r.error.message||'ตั้ง PIN ไม่สำเร็จ'));return}
+        document.getElementById('mp1').value='';document.getElementById('mp2').value='';toast('ตั้ง PIN ผู้จัดการแล้ว ครั้งต่อไปเข้าด้วย PIN ได้เลย')
+      }).catch(function(){toast('ตั้ง PIN ไม่สำเร็จ')});break}
     case 'setpin':{var sp=staffById(d.id),pinp=document.getElementById('p-'+d.id);if(!sp||!pinp)break;var pn=pinp.value.trim(),phs=String(sp.phone||'').replace(/\D/g,'');
       if(phs.length<9){toast('ใส่เบอร์โทรของพนักงานก่อน');break}
       if(!/^\d{6}$/.test(pn)){toast('PIN ต้องเป็นเลข 6 หลัก');break}
