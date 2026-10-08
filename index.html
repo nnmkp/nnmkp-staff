@@ -51,6 +51,13 @@ h1,h2,h3{font-family:var(--f-display);font-weight:500;margin:0;text-wrap:balance
 .circ svg{width:24px;height:24px}
 .top :focus-visible{outline-color:#fff}
 body{overflow-x:clip}
+/* Splash / holding screen: shown while the saved login is checked and data loads, so the sign-in form never flashes. */
+.splash{position:fixed;inset:0;z-index:100;background:var(--accent);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.splash img{width:132px;height:132px;display:block}
+.splash b{font-family:var(--f-display);font-weight:500;font-size:1.5rem;letter-spacing:.02em}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.6s}}
 #sbtint{position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top,0px) + 2px);background:var(--accent);z-index:50;pointer-events:none}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
@@ -205,7 +212,7 @@ input[type=number],input[type=text],input[type=time],input[type=tel],input[type=
 </head>
 <body>
 <div id="sbtint" aria-hidden="true"></div>
-<div class="app" id="app"><div class="empty"><b>กำลังโหลด…</b></div></div>
+<div class="app" id="app"><div class="splash" role="status" aria-live="polite"><img src="icons/icon-192.png" width="132" height="132" alt=""><b>NNMKP Staff</b><div class="spin" aria-hidden="true"></div></div></div>
 <div id="toast" hidden role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
@@ -771,10 +778,12 @@ function vMgr(){
 
 /* ---------- render ---------- */
 function ready(){var r=S.ready;return r.staff&&r.off&&r.pay&&r.cfg&&r.adv&&r.loans}
+function vSplash(){return '<div class="splash" role="status" aria-live="polite"><img src="icons/icon-192.png" width="132" height="132" alt=""><b>NNMKP Staff</b><div class="spin" aria-hidden="true"></div></div>'}
 function render(){
   if(S.fail){$app.innerHTML='<div class="card empty"><b>เปิดหน้านี้ไม่ได้</b>'+esc(S.failMsg||'โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง')+'</div>';return}
+  if(S.booting){$app.innerHTML=vSplash();return}
   if(!S.session){$app.innerHTML=vLogin();return}
-  if(!ready()){$app.innerHTML='<div class="empty"><b>กำลังโหลด…</b></div>';return}
+  if(!ready()){$app.innerHTML=vSplash();return}
   remember();
   $app.innerHTML=S.session.role==='mgr'?vMgr():vStaff();
   hydrate();
@@ -1038,6 +1047,7 @@ function mkAssets(sb){
 }
 
 /* ---------- boot ---------- */
+S.booting=true;
 render();
 (async function(){
   try{
@@ -1046,9 +1056,15 @@ render();
     SB=window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});
     DB=mkAdapter(SB);ASSETS=mkAssets(SB);S.canWrite=true;
     var r=await SB.auth.getSession();
-    if(r.data&&r.data.session)await enterSession(r.data.session.user);else render();
-  }catch(e){S.fail=true;render()}
+    if(r.data&&r.data.session)await enterSession(r.data.session.user);
+    S.booting=false;render();
+  }catch(e){S.booting=false;S.fail=true;render()}
 })();
+/* Resuming an installed app: renew the saved login right away; only fall back to sign-in if there is truly none left. */
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState!=='visible'||!SB||!S.session)return;
+  SB.auth.getSession().then(function(r){if(!(r.data&&r.data.session)){S.session=null;render()}}).catch(function(){});
+});
 })();
 </script>
 <script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
