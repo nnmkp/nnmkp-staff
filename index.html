@@ -251,6 +251,15 @@ input[type=number],input[type=text],input[type=time],input[type=tel],input[type=
 .slip .sh{padding:12px 14px}.slip .sh h3{font-size:1.125rem}
 .slip .sb{padding:14px;gap:12px}
 .mou{padding:10px}
+/* ---- Settings overlap fix ---- */
+.two>*{min-width:0}
+.two input,.two select{min-width:0;max-width:100%;width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none;text-align:left;text-overflow:ellipsis;display:block;margin:0}
+.two input[type=time]{text-align:left;-webkit-min-logical-width:0;line-height:normal}
+.two input[type=time]::-webkit-date-and-time-value{text-align:left;min-width:0}
+.card .two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.fld.full{grid-column:1/-1}
+.fld .addrow input{text-align:left;width:auto;flex:1}
+.fld .addrow .btn{flex:none;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -800,8 +809,8 @@ function vSet(){
       +'<div class="fld"><label for="ph-'+id+'">เบอร์โทร (ใช้เข้าสู่ระบบ)</label><input id="ph-'+id+'" type="tel" inputmode="numeric" value="'+esc(s.phone||'')+'" data-chg="staff" data-f="phone" data-id="'+id+'"></div>'
       +'<div class="fld"><label for="bk-'+id+'">ธนาคาร</label><input id="bk-'+id+'" type="text" placeholder="เช่น กสิกรไทย" value="'+esc(s.bank||'')+'" data-chg="staff" data-f="bank" data-id="'+id+'"></div>'
       +'<div class="fld"><label for="an-'+id+'">เลขบัญชี</label><input id="an-'+id+'" type="text" inputmode="numeric" value="'+esc(s.accNo||'')+'" data-chg="staff" data-f="accNo" data-id="'+id+'"></div>'
-      +'<div class="fld"><label for="ac-'+id+'">ชื่อบัญชี (ถ้าไม่ใส่ใช้ชื่อพนักงาน)</label><input id="ac-'+id+'" type="text" value="'+esc(s.accName||'')+'" data-chg="staff" data-f="accName" data-id="'+id+'"></div>'
-      +'<div class="fld"><label for="p-'+id+'">ตั้ง PIN ใหม่ (6 หลัก) · เปลี่ยนเบอร์แล้วต้องตั้ง PIN อีกครั้ง</label><div class="addrow"><input id="p-'+id+'" type="text" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"><button class="btn alt sm" data-act="setpin" data-id="'+id+'">ตั้ง PIN</button></div></div>'
+      +'<div class="fld full"><label for="ac-'+id+'">ชื่อบัญชี (ถ้าไม่ใส่ใช้ชื่อพนักงาน)</label><input id="ac-'+id+'" type="text" value="'+esc(s.accName||'')+'" data-chg="staff" data-f="accName" data-id="'+id+'"></div>'
+      +'<div class="fld full"><label for="p-'+id+'">ตั้ง PIN ใหม่ (6 หลัก) · เปลี่ยนเบอร์แล้วต้องตั้ง PIN อีกครั้ง</label><div class="addrow"><input id="p-'+id+'" type="text" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"><button class="btn alt sm" data-act="setpin" data-id="'+id+'">ตั้ง PIN</button></div></div>'
       +'<div class="fld"><label for="s-'+id+'">เริ่มงาน</label><input id="s-'+id+'" type="time" value="'+esc(s.start)+'" data-chg="staff" data-f="start" data-id="'+id+'"></div>'
       +'<div class="fld"><label for="e-'+id+'">เลิกงานโดยประมาณ</label><input id="e-'+id+'" type="time" value="'+esc(s.end)+'" data-chg="staff" data-f="end" data-id="'+id+'"></div>'
       +'<div class="fld"><label for="mt-'+id+'">ค่า MOU ทั้งหมด (0 = ไม่มี)</label><input id="mt-'+id+'" type="number" inputmode="numeric" min="0" value="'+(+s.mouTotal||0)+'" data-chg="staff" data-f="mouTotal" data-id="'+id+'"></div>'
