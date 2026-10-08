@@ -286,6 +286,20 @@ input,select,textarea{font-size:16px!important}
 .tabs button svg{flex:none;pointer-events:none}
 .tabs button span{pointer-events:none;white-space:nowrap}
 .tabs button[aria-current="page"]{background:#fbe9cc;color:#973b20;font-weight:500}
+.bell{position:relative}
+.bell .bdg{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#c0392b;color:#fff;font:600 .6875rem/18px var(--f-body);font-style:normal;text-align:center;box-sizing:border-box}
+.bell[aria-pressed="true"]{background:rgba(255,255,255,.2)}
+.top>.circ.bell+.circ{margin-left:0}
+.nlist{display:flex;flex-direction:column;gap:8px}
+.nitem{display:flex;align-items:flex-start;gap:12px;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--fg);font:inherit;position:relative}
+.nitem.fresh{background:#fff3d9;border-color:#f3d79a}
+.nic{flex:none;width:36px;height:36px;border-radius:50%;background:#fbe9cc;color:#973b20;display:flex;align-items:center;justify-content:center}
+.nitem.bad .nic{background:#f7d9d2;color:#b3392b}
+.ntx{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.ntx b{font-weight:500}
+.ntx span{color:var(--muted);font-size:.875rem}
+.ntx small{color:var(--muted);font-size:.75rem;opacity:.85}
+.ndot{flex:none;width:9px;height:9px;border-radius:50%;background:#c0392b;margin-top:6px}
 </style>
 </head>
 <body>
@@ -434,13 +448,57 @@ function remember(){
 }
 
 var ICON_OUT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M16 8l4 4-4 4"/><path d="M20 12H9"/></svg>';
-function band(sub,withOut){
+var ICON_BELL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6.5 2 6.5H4S6 14 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>';
+function band(sub,withOut,extra){
   return '<div class="top"><div class="who"><b>NNMKP Staff</b><span>'+esc(sub)+'</span></div>'
-    +(withOut?'<button class="circ" data-act="logout" aria-label="ออกจากระบบ">'+ICON_OUT+'</button>':'')+'</div>';
+    +(extra||'')+(withOut?'<button class="circ" data-act="logout" aria-label="ออกจากระบบ">'+ICON_OUT+'</button>':'')+'</div>';
 }
 function header(){
-  var st=me();
-  return band(S.session.role==='mgr'?'ผู้จัดการ · จัดการทีมทั้งสองสาขา':(st?st.name+' · '+st.branch+' · '+shiftLabel(st):''),true);
+  var st=me(), n=notifs(), un=notifUnread(n);
+  var bell='<button class="circ bell" data-act="bell" aria-label="การแจ้งเตือน'+(un?' '+un+' รายการใหม่':'')+'"'+(S.notif?' aria-pressed="true"':'')+'>'+ICON_BELL+(un?'<i class="bdg">'+(un>9?'9+':un)+'</i>':'')+'</button>';
+  return band(S.session.role==='mgr'?'ผู้จัดการ · จัดการทีมทั้งสองสาขา':(st?st.name+' · '+st.branch+' · '+shiftLabel(st):''),true,bell);
+}
+/* ----- notifications (คำนวณจากข้อมูลที่มีอยู่ ไม่ต้องเพิ่มตารางใหม่) ----- */
+function seenKey(){return 'nnmkp-seen-'+(S.session&&S.session.id||'mgr')}
+function getSeen(){try{return +localStorage.getItem(seenKey())||0}catch(e){return 0}}
+function setSeen(t){try{localStorage.setItem(seenKey(),String(t))}catch(e){}}
+function notifs(){
+  if(!S.session||!S.ready||!ready())return [];
+  var out=[], mgr=S.session.role==='mgr', cut=Date.now()-30*864e5;
+  if(mgr){
+    S.off.filter(function(o){return o.status==='pending'}).forEach(function(o){var st=staffById(o.staffId);if(!st)return;
+      out.push({k:'o'+o.id,at:+o.at||0,tab:'req',ico:'cal',title:'คำขอหยุดใหม่',body:st.name+' ('+st.branch+') ขอหยุดวันที่ '+dateShort(o.date),pend:true})});
+    S.adv.filter(function(a){return a.status==='pending'}).forEach(function(a){var st=staffById(a.staffId);if(!st)return;
+      out.push({k:'a'+a.id,at:+a.at||0,tab:'req',ico:'pay',title:'คำขอเบิกเงินล่วงหน้า',body:st.name+' ('+st.branch+') ขอเบิก ฿'+fmt(a.amount),pend:true})});
+  }else{
+    var id=S.session.id;
+    S.off.filter(function(o){return o.staffId===id&&o.decidedAt}).forEach(function(o){var ok=o.status==='approved';
+      out.push({k:'od'+o.id,at:o.decidedAt,tab:'cal',ico:'cal',title:ok?'อนุมัติวันหยุดแล้ว':'ไม่อนุมัติวันหยุด',body:ok?'วันหยุดวันที่ '+dateShort(o.date)+' ได้รับการอนุมัติ':'คำขอหยุดวันที่ '+dateShort(o.date)+' ไม่ได้รับการอนุมัติ',bad:!ok})});
+    S.adv.filter(function(a){return a.staffId===id}).forEach(function(a){
+      if(a.decidedAt&&(a.status==='approved'||a.status==='rejected')){var ok=a.status==='approved';
+        out.push({k:'ad'+a.id,at:a.decidedAt,tab:'adv',ico:'pay',title:ok?'อนุมัติการเบิกเงินแล้ว':'ไม่อนุมัติการเบิกเงิน',body:ok?'คำขอเบิก ฿'+fmt(a.amount)+' ได้รับการอนุมัติ รอรับเงินโอน':'คำขอเบิก ฿'+fmt(a.amount)+' ไม่ได้รับการอนุมัติ',bad:!ok})}
+      var pr=(a.proofs||[]).reduce(function(m,x){return Math.max(m,+x.at||0)},0);
+      if(pr)out.push({k:'ap'+a.id,at:pr,tab:'adv',ico:'slip',title:'โอนเงินเบิกล่วงหน้าแล้ว',body:'โอนเงิน ฿'+fmt(a.amount)+' เรียบร้อย ดูสลิปโอนเงินได้ที่หน้าเบิกเงิน'})});
+    Object.keys(S.pay).forEach(function(k){var p=S.pay[k];if(!p||p.staffId!==id||!p.ym)return;var mn=TH_M[+p.ym.split('-')[1]-1];
+      if(p.published&&p.slip&&p.slip.at)out.push({k:'ps'+k,at:p.slip.at,tab:'slip',ico:'slip',title:'สลิปเงินเดือนอนุมัติแล้ว',body:'สลิปเงินเดือน'+mn+' ออกแล้ว ยอดสุทธิ ฿'+fmt(p.slip.net)});
+      var pr=(p.proofs||[]).reduce(function(m,x){return Math.max(m,+x.at||0)},0);
+      if(pr)out.push({k:'pp'+k,at:pr,tab:'slip',ico:'slip',title:'โอนเงินเดือนแล้ว',body:'โอนเงินเดือน'+mn+' เรียบร้อย ดูสลิปโอนเงินได้ที่หน้าสลิปเงินเดือน'})});
+    out=out.filter(function(n){return n.at>cut});
+  }
+  return out.sort(function(a,b){return b.at-a.at});
+}
+function notifUnread(n){
+  if(S.session&&S.session.role==='mgr')return n.length;
+  var seen=getSeen();return n.filter(function(x){return x.at>seen}).length;
+}
+function agoTxt(t){if(!t)return '';var m=Math.round((Date.now()-t)/6e4);if(m<1)return 'เมื่อสักครู่';if(m<60)return m+' นาทีที่แล้ว';var h=Math.round(m/60);if(h<24)return h+' ชั่วโมงที่แล้ว';var d=new Date(t);return d.getDate()+' '+TH_M[d.getMonth()]}
+function vNotif(){
+  var n=notifs(), mgr=S.session.role==='mgr', seen=S.nprev||0;
+  var h='<div class="grp"><h2>การแจ้งเตือน</h2>';
+  if(!n.length)return h+'<div class="card empty"><b>ยังไม่มีการแจ้งเตือน</b>'+(mgr?'เมื่อพนักงานขอหยุดหรือขอเบิกเงิน จะขึ้นที่นี่':'เมื่อมีการอนุมัติหรือโอนเงิน จะขึ้นที่นี่')+'</div></div>';
+  h+='<div class="nlist">'+n.map(function(x){var fresh=mgr||x.at>seen;
+    return '<button class="nitem'+(fresh?' fresh':'')+(x.bad?' bad':'')+'" data-act="nopen" data-t="'+x.tab+'"><span class="nic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(TABICO[x.ico]||'')+'</svg></span><span class="ntx"><b>'+esc(x.title)+'</b><span>'+esc(x.body)+'</span><small>'+esc(agoTxt(x.at))+'</small></span>'+(fresh?'<i class="ndot"></i>':'')+'</button>'}).join('')+'</div></div>';
+  return h;
 }
 var TABICO={
   cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
@@ -647,7 +705,7 @@ function vStaff(){
   if(!st)return header()+'<div class="card empty"><b>ไม่พบข้อมูลพนักงาน</b>กรุณาออกแล้วเลือกชื่ออีกครั้ง</div>';
   var h=header();
   if(S.canWrite===false)h+='<div class="card note">บัญชีนี้ดูได้อย่างเดียว ขอหยุดไม่ได้</div>';
-  h+=S.tab==='slip'?vSlip(st):S.tab==='adv'?vAdv(st):vCal(st);
+  h+=S.notif?vNotif():S.tab==='slip'?vSlip(st):S.tab==='adv'?vAdv(st):vCal(st);
   return h+tabsHtml([['cal','ปฏิทิน'],['adv','เบิกเงิน'],['slip','สลิปเงินเดือน']]);
 }
 
@@ -891,7 +949,7 @@ function vSet(){
 function vMgr(){
   var h=header();
   if(S.canWrite===false)h+='<div class="card note">บัญชีนี้ดูได้อย่างเดียว แก้ไขข้อมูลไม่ได้</div>';
-  var body={req:vReq,sched:vSched,pay:vPay,set:vSet}[S.tab]||vReq;
+  var body=S.notif?vNotif:({req:vReq,sched:vSched,pay:vPay,set:vSet}[S.tab]||vReq);
   return h+body()+tabsHtml([['req','คำขอ'],['sched','ตารางงาน'],['pay','เงินเดือน'],['set','ตั้งค่า']]);
 }
 
@@ -987,7 +1045,9 @@ document.addEventListener('click',function(e){
     case 'pin':if(S.pin.length<6){S.pin+=d.k;if(S.pin.length===6){render();setTimeout(afterPin,120)}else render()}break;
     case 'pinback':S.pin=S.pin.slice(0,-1);render();break;
     case 'logout':SB.auth.signOut().then(function(){location.reload()},function(){location.reload()});break;
-    case 'tab':S.tab=d.t;render();break;
+    case 'tab':S.tab=d.t;S.notif=false;render();break;
+    case 'bell':if(S.notif){S.notif=false}else{S.nprev=getSeen();setSeen(Date.now());S.notif=true}render();break;
+    case 'nopen':S.tab=d.t;S.notif=false;render();break;
     case 'ym':{var p=S.ym.split('-').map(Number);var n=new Date(p[0],p[1]-1+Number(d.d),1);S.ym=n.getFullYear()+'-'+pad(n.getMonth()+1);S.sel=null;S.msel=null;render();break}
     case 'seldate':S.sel=d.d;render();break;
     case 'mseldate':if(S.pstaff)toggleOff(S.pstaff,d.d);else{S.msel=S.msel===d.d?null:d.d;render()}break;
@@ -1011,8 +1071,8 @@ document.addEventListener('click',function(e){
     case 'approve':{
       var o=S.off.find(function(x){return x.id===d.k}); if(!o)break; var s3=staffById(o.staffId), m3=s3&&mateOf(s3), mo3=m3&&offOf(m3.id,o.date);
       if(mo3&&mo3.status==='approved'){toast(m3.name+' ได้หยุดวันนี้แล้ว อนุมัติซ้ำไม่ได้');break}
-      save('dayoffs/'+o.id,Object.assign({},o,{status:'approved'})).then(function(){toast('อนุมัติแล้ว')});break}
-    case 'reject':{var o2=S.off.find(function(x){return x.id===d.k});if(o2)save('dayoffs/'+o2.id,Object.assign({},o2,{status:'rejected'})).then(function(){toast('ไม่อนุมัติ')});break}
+      save('dayoffs/'+o.id,Object.assign({},o,{status:'approved',decidedAt:Date.now()})).then(function(){toast('อนุมัติแล้ว')});break}
+    case 'reject':{var o2=S.off.find(function(x){return x.id===d.k});if(o2)save('dayoffs/'+o2.id,Object.assign({},o2,{status:'rejected',decidedAt:Date.now()})).then(function(){toast('ไม่อนุมัติ')});break}
     case 'cancelapproved':del('dayoffs/'+d.k).then(function(){toast('ยกเลิกวันหยุดแล้ว')});break;
     case 'viewproof':{closeLb();var lb=document.createElement('div');lb.className='lb';lb.id='lb';lb.setAttribute('role','dialog');lb.setAttribute('aria-label','สลิปโอนเงิน');
       lb.innerHTML=(d.type==='application/pdf'?'<iframe title="สลิปโอนเงิน"></iframe>':'<img alt="สลิปโอนเงิน">')+'<button type="button" class="btn" id="lb-x">ปิด</button>';
