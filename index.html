@@ -330,24 +330,28 @@ function vLogin(){
     keys+='<button class="fn" data-act="pickback">กลับ</button><button data-act="pin" data-k="0">0</button><button class="fn" data-act="pinback" aria-label="ลบ">ลบ</button>';
     return h+'<div class="card"><h1>'+esc(S.pick.name||S.pick.phone)+'</h1><div class="sub" style="margin-top:-8px">กดรหัส PIN 6 หลัก</div><div class="dots" aria-label="รหัสที่กดแล้ว '+S.pin.length+' หลัก">'+dots+'</div><div class="pad">'+keys+'</div></div>';
   }
-  var mem=memAccts();
+  var mem=memAccts(), mg=memMgr();
   if(S.loginMode==='mgr'){
-    return h+'<div class="card"><h1 style="font-size:1.5rem">เจ้าของ / ผู้จัดการ</h1><div class="fld"><label for="m-email">อีเมล</label><input id="m-email" type="email" autocomplete="username" inputmode="email"></div><div class="fld"><label for="m-pw">รหัสผ่าน</label><input id="m-pw" type="password" autocomplete="current-password"></div><button class="btn" data-act="mgrsubmit">เข้าสู่ระบบ</button><button class="btn alt" data-act="acctback">กลับ</button></div>';
+    return h+'<div class="card"><h1 style="font-size:1.5rem">เจ้าของ / ผู้จัดการ</h1><div class="fld"><label for="m-email">อีเมล</label><input id="m-email" type="email" autocomplete="username" inputmode="email" value="'+esc(mg)+'"></div><div class="fld"><label for="m-pw">รหัสผ่าน</label><input id="m-pw" type="password" autocomplete="current-password"></div><button class="btn" data-act="mgrsubmit">เข้าสู่ระบบ</button><button class="btn alt" data-act="acctback">กลับ</button></div>';
   }
-  if(S.loginMode==='phone'||!mem.length){
+  if(S.loginMode==='phone'||(!mem.length&&!mg)){
     h+='<div class="card"><h1 style="font-size:1.5rem">เข้าสู่ระบบ</h1><div class="fld"><label for="login-phone">เบอร์โทรของคุณ</label><input id="login-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="0xxxxxxxxx"></div><button class="btn" data-act="phonenext">ถัดไป</button>'+(mem.length?'<button class="btn alt" data-act="acctback">กลับ</button>':'')+'</div>';
   }else{
     h+='<div class="card acctcard"><h1 style="font-size:1.25rem">เลือกบัญชีที่เคยใช้</h1>'
+      +(mg?'<div class="acct"><button class="acct-main" data-act="mgrpick"><span class="av">'+ICON_USER+'</span><span class="ai"><b>ผู้จัดการ</b><small>'+esc(mg)+'</small></span><span class="chev">'+ICON_CHEV+'</span></button>'
+          +'<button class="acct-x" data-act="mgrforget" aria-label="ลบบัญชีผู้จัดการออกจากเครื่องนี้">'+ICON_X+'</button></div>':'')
       +mem.map(function(r){
         return '<div class="acct"><button class="acct-main" data-act="pick" data-phone="'+esc(r.phone)+'" data-name="'+esc(r.name||'')+'"><span class="av">'+ICON_USER+'</span><span class="ai"><b>'+esc(r.name||r.phone)+'</b><small>'+esc(r.phone)+'</small></span><span class="chev">'+ICON_CHEV+'</span></button>'
           +'<button class="acct-x" data-act="forget" data-phone="'+esc(r.phone)+'" aria-label="ลบบัญชี '+esc(r.name||r.phone)+' ออกจากเครื่องนี้">'+ICON_X+'</button></div>'}).join('')+'</div>'
       +'<button class="btn alt" data-act="addacct">ใช้บัญชีอื่น</button>';
   }
-  return h+'<button class="btn alt" data-act="mgrlogin" style="margin-top:12px">เจ้าของ / ผู้จัดการ</button>';
+  return h+(mg?'':'<button class="btn alt" data-act="mgrlogin" style="margin-top:12px">เจ้าของ / ผู้จัดการ</button>');
 }
 var ICON_USER='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3-6 7-6s7 2.4 7 6"/></svg>';
 var ICON_CHEV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 var ICON_X='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+function memMgr(){try{return localStorage.getItem('nnmkp-mgr')||''}catch(e){return ''}}
+function setMgr(v){try{if(v)localStorage.setItem('nnmkp-mgr',v);else localStorage.removeItem('nnmkp-mgr')}catch(e){}}
 function memAccts(){try{var a=JSON.parse(localStorage.getItem('nnmkp-accts')||'[]');return Array.isArray(a)?a.filter(function(x){return x&&x.phone}):[]}catch(e){return []}}
 function setMem(a){try{localStorage.setItem('nnmkp-accts',JSON.stringify(a))}catch(e){}}
 function remember(){
@@ -828,11 +832,14 @@ function enterSession(user){
     var p=r.data;
     if(!p){toast('บัญชีนี้ยังไม่ได้ตั้งสิทธิ์ ติดต่อผู้จัดการ');SB.auth.signOut();S.pick=null;S.pin='';render();return}
     var mgr=p.role==='manager';
+    if(mgr&&user.email)setMgr(user.email);
     S.session=mgr?{role:'mgr'}:{role:'staff',id:p.staff_id};
     S.tab=mgr?'req':'cal';
     if(!mgr&&S.pick)S.rememberPhone=S.pick.phone;
     S.pick=null;S.pin='';S.loginMode='';
     S.sel=todayStr().indexOf(S.ym)===0?todayStr():null;S.msel=null;
+    try{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur()}catch(e){}
+    S.dirty=false;
     startData();render();
   });
 }
@@ -854,6 +861,8 @@ document.addEventListener('click',function(e){
     case 'addacct':S.loginMode='phone';render();break;
     case 'acctback':S.loginMode='';render();break;
     case 'mgrlogin':S.loginMode='mgr';render();break;
+    case 'mgrpick':S.loginMode='mgr';render();setTimeout(function(){var i=document.getElementById('m-pw');if(i)i.focus()},50);break;
+    case 'mgrforget':setMgr('');render();break;
     case 'phonenext':{var dg=String(document.getElementById('login-phone').value).replace(/\D/g,'');
       if(dg.length<9||dg.length>10){toast('ใส่เบอร์โทร 10 หลัก');break}
       var known=memAccts().find(function(x){return x.phone===dg});
