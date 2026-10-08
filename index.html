@@ -501,8 +501,11 @@ function notifUnread(n){
 /* ----- Web Push ----- */
 function pushSupported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&!!CFG.vapid}
 function b64u(k){var p='='.repeat((4-k.length%4)%4),b=(k+p).replace(/-/g,'+').replace(/_/g,'/'),r=atob(b),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
-function pushSave(sub){var j=sub.toJSON();return SB.auth.getUser().then(function(u){var uid=u.data&&u.data.user&&u.data.user.id;if(!uid)return;
-  return SB.from('push_subs').upsert({endpoint:j.endpoint,user_id:uid,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'endpoint'})})}
+function pushSave(sub){var j=sub.toJSON();return SB.rpc('register_push',{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth})}
+function pushLeave(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return Promise.resolve();
+  return navigator.serviceWorker.ready.then(function(reg){return reg.pushManager.getSubscription()}).then(function(sub){
+    return sub?SB.rpc('unregister_push',{p_endpoint:sub.endpoint}):null}).catch(function(){})}
 function pushRefresh(){
   if(!pushSupported()||!S.session)return;
   navigator.serviceWorker.ready.then(function(reg){return reg.pushManager.getSubscription()}).then(function(sub){
@@ -1088,7 +1091,7 @@ document.addEventListener('click',function(e){
     case 'pickback':S.pick=null;S.pin='';render();break;
     case 'pin':if(S.pin.length<6){S.pin+=d.k;if(S.pin.length===6){render();setTimeout(afterPin,120)}else render()}break;
     case 'pinback':S.pin=S.pin.slice(0,-1);render();break;
-    case 'logout':SB.auth.signOut().then(function(){location.reload()},function(){location.reload()});break;
+    case 'logout':pushLeave().then(function(){return SB.auth.signOut()}).then(function(){location.reload()},function(){location.reload()});break;
     case 'tab':S.tab=d.t;S.notif=false;render();break;
     case 'pushon':pushEnable();break;
     case 'bell':if(S.notif){S.notif=false}else{S.nprev=getSeen();setSeen(Date.now());S.notif=true}render();break;
