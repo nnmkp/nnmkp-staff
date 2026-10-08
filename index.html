@@ -318,7 +318,7 @@ input,select,textarea{font-size:16px!important}
 var $app=document.getElementById('app'), $toast=document.getElementById('toast');
 var CFG=window.NNMKP_CONFIG||{};
 var DB=null, ASSETS=null, SB=null, tt=0;
-var S={staff:[],off:[],adv:[],loans:[],paystaff:null,loginMode:'',failMsg:'',apick:0,pay:{},cfg:null,ready:{staff:false,off:false,pay:false,cfg:false,adv:false,loans:false},session:null,tab:'cal',ym:null,sel:null,msel:null,pstaff:null,pcover:'auto',sview:'cal',pick:null,pin:'',canWrite:null,dirty:false,fail:false};
+var S={staff:[],off:[],adv:[],loans:[],notices:[],paystaff:null,loginMode:'',failMsg:'',apick:0,pay:{},cfg:null,ready:{staff:false,off:false,pay:false,cfg:false,adv:false,loans:false},session:null,tab:'cal',ym:null,sel:null,msel:null,pstaff:null,pcover:'auto',sview:'cal',pick:null,pin:'',canWrite:null,dirty:false,fail:false};
 
 /* ---------- helpers ---------- */
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})};
@@ -472,8 +472,13 @@ function notifs(){
       out.push({k:'o'+o.id,at:+o.at||0,tab:'req',ico:'cal',title:'คำขอหยุดใหม่',body:st.name+' ('+st.branch+') ขอหยุดวันที่ '+dateShort(o.date),pend:true})});
     S.adv.filter(function(a){return a.status==='pending'}).forEach(function(a){var st=staffById(a.staffId);if(!st)return;
       out.push({k:'a'+a.id,at:+a.at||0,tab:'req',ico:'pay',title:'คำขอเบิกเงินล่วงหน้า',body:st.name+' ('+st.branch+') ขอเบิก ฿'+fmt(a.amount),pend:true})});
+    S.notices.filter(function(n){return n.kind==='dayoff_cancel'&&n.by==='staff'}).forEach(function(n){var st=staffById(n.staffId);if(!st)return;
+      out.push({k:'nc'+n.id,at:+n.at||0,tab:'sched',ico:'cal',title:'พนักงานยกเลิกวันหยุด',body:st.name+' ('+st.branch+') ยกเลิกวันหยุดวันที่ '+dateShort(n.date),bad:true})});
+    out=out.filter(function(n){return n.pend||n.at>cut});
   }else{
     var id=S.session.id;
+    S.notices.filter(function(n){return n.kind==='dayoff_cancel'&&n.by==='mgr'&&n.staffId===id}).forEach(function(n){
+      out.push({k:'nc'+n.id,at:+n.at||0,tab:'cal',ico:'cal',title:'ผู้จัดการยกเลิกวันหยุด',body:'วันหยุดวันที่ '+dateShort(n.date)+' ถูกยกเลิก',bad:true})});
     S.off.filter(function(o){return o.staffId===id&&o.decidedAt}).forEach(function(o){var ok=o.status==='approved';
       out.push({k:'od'+o.id,at:o.decidedAt,tab:'cal',ico:'cal',title:ok?'อนุมัติวันหยุดแล้ว':'ไม่อนุมัติวันหยุด',body:ok?'วันหยุดวันที่ '+dateShort(o.date)+' ได้รับการอนุมัติ':'คำขอหยุดวันที่ '+dateShort(o.date)+' ไม่ได้รับการอนุมัติ',bad:!ok})});
     S.adv.filter(function(a){return a.staffId===id}).forEach(function(a){
@@ -490,8 +495,8 @@ function notifs(){
   return out.sort(function(a,b){return b.at-a.at});
 }
 function notifUnread(n){
-  if(S.session&&S.session.role==='mgr')return n.length;
-  var seen=getSeen();return n.filter(function(x){return x.at>seen}).length;
+  var seen=getSeen(), mgr=S.session&&S.session.role==='mgr';
+  return n.filter(function(x){return mgr&&x.pend||x.at>seen}).length;
 }
 /* ----- Web Push ----- */
 function pushSupported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&!!CFG.vapid}
@@ -520,7 +525,8 @@ function syncBadge(){
 function pushCard(){
   var inApp=window.matchMedia&&matchMedia('(display-mode: standalone)').matches||navigator.standalone;
   if(S.pushOn)return '<div class="card note">เปิดการแจ้งเตือนบนเครื่องนี้แล้ว ✓</div>';
-  if(!pushSupported()||!inApp)return '<div class="card"><b>เปิดการแจ้งเตือนบนมือถือ</b><div class="sub">ต้องเพิ่มแอปลงหน้าจอหลักก่อน (Safari → ปุ่มแชร์ → เพิ่มลงในหน้าจอโฮม) แล้วเปิดแอปจากไอคอน ใช้ได้กับ iOS 16.4 ขึ้นไป</div></div>';
+  var ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  if(!pushSupported()||(ios&&!inApp))return '<div class="card"><b>เปิดการแจ้งเตือนบนมือถือ</b><div class="sub">'+(ios?'ต้องเพิ่มแอปลงหน้าจอหลักก่อน (Safari → ปุ่มแชร์ → เพิ่มลงในหน้าจอโฮม) แล้วเปิดแอปจากไอคอน ใช้ได้กับ iOS 16.4 ขึ้นไป':'เบราว์เซอร์นี้ยังไม่รองรับ ให้ใช้ Chrome แล้วเลือก ติดตั้งแอป / เพิ่มลงหน้าจอหลัก')+'</div></div>';
   if(S.pushDenied||Notification.permission==='denied')return '<div class="card"><b>การแจ้งเตือนถูกปิดอยู่</b><div class="sub">เปิดได้ที่ ตั้งค่า (Settings) ของ iPhone → แจ้งเตือน → NNMKP Staff</div></div>';
   return '<div class="card"><b>รับแจ้งเตือนแม้ปิดแอป</b><div class="sub">แจ้งเตือนเด้งที่หน้าจอ และมีเลขแดงที่ไอคอนแอป</div><button class="btn" data-act="pushon">เปิดการแจ้งเตือน</button></div>'}
 function agoTxt(t){if(!t)return '';var m=Math.round((Date.now()-t)/6e4);if(m<1)return 'เมื่อสักครู่';if(m<60)return m+' นาทีที่แล้ว';var h=Math.round(m/60);if(h<24)return h+' ชั่วโมงที่แล้ว';var d=new Date(t);return d.getDate()+' '+TH_M[d.getMonth()]}
@@ -528,7 +534,7 @@ function vNotif(){
   var n=notifs(), mgr=S.session.role==='mgr', seen=S.nprev||0;
   var h=pushCard()+'<div class="grp"><h2>การแจ้งเตือน</h2>';
   if(!n.length)return h+'<div class="card empty"><b>ยังไม่มีการแจ้งเตือน</b>'+(mgr?'เมื่อพนักงานขอหยุดหรือขอเบิกเงิน จะขึ้นที่นี่':'เมื่อมีการอนุมัติหรือโอนเงิน จะขึ้นที่นี่')+'</div></div>';
-  h+='<div class="nlist">'+n.map(function(x){var fresh=mgr||x.at>seen;
+  h+='<div class="nlist">'+n.map(function(x){var fresh=(mgr&&x.pend)||x.at>seen;
     return '<button class="nitem'+(fresh?' fresh':'')+(x.bad?' bad':'')+'" data-act="nopen" data-t="'+x.tab+'"><span class="nic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(TABICO[x.ico]||'')+'</svg></span><span class="ntx"><b>'+esc(x.title)+'</b><span>'+esc(x.body)+'</span><small>'+esc(agoTxt(x.at))+'</small></span>'+(fresh?'<i class="ndot"></i>':'')+'</button>'}).join('')+'</div></div>';
   return h;
 }
@@ -1023,6 +1029,7 @@ function startData(){
     S.ready.staff=true;schedule()},onErr);
   DB.collection('dayoffs').onSnapshot(function(s){
     S.off=s.docs.map(function(d){return Object.assign({id:d.id},d.data())});S.ready.off=true;schedule()},onErr);
+  DB.collection('notices').onSnapshot(function(s){S.notices=s.docs.map(function(d){return Object.assign({id:d.id},d.data())});schedule()},function(){});
   DB.collection('loans').onSnapshot(function(s){
     S.loans=s.docs.map(function(d){return Object.assign({id:d.id},d.data())});S.ready.loans=true;schedule()},onErr);
   DB.collection('advances').onSnapshot(function(s){
