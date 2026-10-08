@@ -95,7 +95,7 @@ body{overflow-x:clip}
 .pad .fn{font-size:1rem;font-family:var(--f-body);color:var(--muted)}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .nav b{font-family:var(--f-display);font-weight:500;font-size:1.125rem}
-.nav button{min-width:48px;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:1.25rem}
+.nav button{min-width:48px;min-height:48px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:1.25rem}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal .dw{text-align:center;font-size:.8125rem;color:var(--muted);padding-block:4px}
 .cal button,.cal .blank{min-height:58px;border-radius:10px}
@@ -116,7 +116,7 @@ body{overflow-x:clip}
 .cal button:disabled{opacity:.45}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.8125rem;color:var(--muted)}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid var(--line)}
-.btn{min-height:52px;border-radius:12px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:10px 18px}
+.btn{min-height:52px;border-radius:999px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:10px 18px}
 .btn.alt{background:transparent;color:var(--fg);border:1px solid var(--line);font-weight:500}
 .btn.bad{background:var(--bad-soft);color:var(--bad)}
 .btn.sm{min-height:44px;padding:6px 14px}
@@ -126,7 +126,7 @@ body{overflow-x:clip}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
-.tabs button{flex:1;min-height:52px;border:0;background:transparent;border-radius:10px;color:var(--muted);font-weight:500;font-size:.9375rem}
+.tabs button{flex:1;min-height:52px;border:0;background:transparent;border-radius:999px;color:var(--muted);font-weight:500;font-size:.9375rem}
 .tabs button[aria-current="page"]{background:var(--accent);color:var(--accent-ink);font-weight:700}
 .ch{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .nm{font-family:var(--f-display);font-size:1.25rem}
@@ -171,11 +171,14 @@ input[type=number],input[type=text],input[type=time],input[type=tel],input[type=
 .step button{width:48px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:1.25rem}
 .step b{min-width:2ch;text-align:center;font-variant-numeric:tabular-nums;font-size:1.125rem}
 .item{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px dashed var(--line);padding-block:4px}
-.seg{display:flex;gap:4px;background:var(--off);border-radius:12px;padding:4px}
-.seg button{flex:1;min-height:44px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-weight:500}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.seg{display:flex;gap:4px;background:var(--off);border-radius:999px;padding:4px}
+.seg button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:700;box-shadow:0 1px 4px rgba(58,31,20,.18)}
 .picks{display:flex;flex-wrap:wrap;gap:8px}
 .picks button{min-height:48px;padding:6px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-weight:500}
+.picks.one{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px}
+.picks.one button{padding:6px 2px;min-height:52px;line-height:1.25;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picks.one button small{display:block;font-size:.6875rem}
 .picks button small{color:var(--muted);font-size:.75rem}
 .picks button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
 .picks button[aria-pressed="true"] small{color:var(--accent-ink)}
@@ -579,8 +582,8 @@ function vSched(){
 function vSchedCal(){
   var p=S.ym.split('-').map(Number), y=p[0], m=p[1]-1, first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate(), today=todayStr();
   var ps=S.pstaff&&staffById(S.pstaff);
-  var h='<div class="grp"><h2 style="text-transform:none;letter-spacing:0;font-size:.9375rem;color:var(--fg)">ลงวันหยุดให้ใคร</h2><div class="picks">'
-    +S.staff.map(function(s){return '<button data-act="pstaff" data-id="'+esc(s.id)+'"'+(S.pstaff===s.id?' aria-pressed="true"':'')+'>'+esc(s.name)+' <small>'+esc(s.branch)+'</small></button>'}).join('')+'</div>'
+  var h='<div class="grp"><h2 style="text-transform:none;letter-spacing:0;font-size:.9375rem;color:var(--fg)">ลงวันหยุดให้ใคร</h2><div class="picks one">'
+    +S.staff.map(function(s){return '<button data-act="pstaff" data-id="'+esc(s.id)+'"'+(S.pstaff===s.id?' aria-pressed="true"':'')+'>'+esc(s.name)+'<small>'+esc(s.branch)+'</small></button>'}).join('')+'</div>'
     +'<div class="note">'+(ps?'กำลังลงวันหยุดให้ <b>'+esc(ps.name)+'</b> · แตะวันที่ได้หลายวัน แตะซ้ำที่วันเดิมเพื่อยกเลิก':(S.msel&&S.msel.indexOf(S.ym)===0?'เลือก <b>'+esc(dateLong(S.msel))+'</b> แล้ว · แตะชื่อด้านบนเพื่อลงวันหยุดวันนี้':'แตะชื่อแล้วแตะวันที่ หรือแตะวันที่ก่อนแล้วแตะชื่อก็ได้'))+'</div></div>';
   if(ps){
     var mt0=mateOf(ps);
