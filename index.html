@@ -560,9 +560,10 @@ function loanSection(st){
   });
   var opts='';for(var i=0;i<12;i++){var p=S.ym.split('-').map(Number),d=new Date(p[0],p[1]-1+i,1),v=d.getFullYear()+'-'+pad(d.getMonth()+1);opts+='<option value="'+v+'">'+esc(ymLabel(v))+'</option>'}
   h+='<div class="fld"><label>เพิ่มเงินยืมใหม่</label><input id="ll-'+id+'" type="text" placeholder="ชื่อรายการ เช่น ยืมจากร้าน" aria-label="ชื่อรายการยืม"></div>'
-    +'<div class="two"><div class="fld"><label for="lt-'+id+'">ยอดที่ต้องผ่อน (บาท)</label><input id="lt-'+id+'" type="number" inputmode="numeric" min="0"></div>'
-    +'<div class="fld"><label for="lm-'+id+'">หักเดือนละ (บาท)</label><input id="lm-'+id+'" type="number" inputmode="numeric" min="0"></div></div>'
-    +'<div class="fld"><label for="ls-'+id+'">เริ่มหักเดือน</label><select id="ls-'+id+'">'+opts+'</select></div>'
+    +'<div class="two"><div class="fld"><label for="lt-'+id+'">ยอดที่ยืมทั้งหมด (บาท)</label><input id="lt-'+id+'" type="number" inputmode="numeric" min="0"></div>'
+    +'<div class="fld"><label for="lm-'+id+'">หักเดือนละ (บาท · ว่างได้)</label><input id="lm-'+id+'" type="number" inputmode="numeric" min="0"></div></div>'
+    +'<div class="two"><div class="fld"><label for="lp-'+id+'">คืนแล้วก่อนใช้แอป (บาท)</label><input id="lp-'+id+'" type="number" inputmode="numeric" min="0" placeholder="0"></div>'
+    +'<div class="fld"><label for="ls-'+id+'">เริ่มหักเดือน</label><select id="ls-'+id+'">'+opts+'</select></div></div>'
     +'<button class="btn alt sm" data-act="loanadd" data-id="'+id+'">เพิ่มเงินยืม</button>';
   return h;
 }
@@ -1021,9 +1022,9 @@ document.addEventListener('click',function(e){
     case 'rmaproof':{var ar=S.adv.find(function(x){return x.id===d.k});if(!ar)break;var br2=Object.assign({},ar);delete br2.id;br2.proofs=(ar.proofs||[]).filter(function(x){return x.id!==d.pid});
       save('advances/'+ar.id,br2).then(function(){if(ASSETS)ASSETS.delete(d.pid).catch(function(){});toast('ลบสลิปโอนเงินแล้ว')});break}
     case 'loanadd':{
-      var lbl=document.getElementById('ll-'+d.id).value.trim(), lt=Number(document.getElementById('lt-'+d.id).value), lm=Number(document.getElementById('lm-'+d.id).value), ls=document.getElementById('ls-'+d.id).value;
-      if(!lbl||!(lt>0)||!(lm>0)){toast('ใส่ชื่อรายการ ยอดที่ต้องผ่อน และยอดหักต่อเดือน');break}
-      save('loans/loan'+Date.now().toString(36)+'_'+d.id,{staffId:d.id,label:lbl,total:Math.round(lt),monthly:Math.round(lm),start:ls,paidBefore:0,date:todayStr(),at:Date.now()}).then(function(){toast('เพิ่มเงินยืมแล้ว')});break}
+      var lbl=document.getElementById('ll-'+d.id).value.trim(), lt=Number(document.getElementById('lt-'+d.id).value), lm=Number(document.getElementById('lm-'+d.id).value)||0, lpb=Math.max(0,Math.min(Number(document.getElementById('lp-'+d.id).value)||0,Number(document.getElementById('lt-'+d.id).value)||0)), ls=document.getElementById('ls-'+d.id).value;
+      if(!lbl||!(lt>0)||!(lm>=0)){toast('ใส่ชื่อรายการ และยอดที่ยืมทั้งหมด (ยอดหักต่อเดือนเว้นว่างได้)');break}
+      save('loans/loan'+Date.now().toString(36)+'_'+d.id,{staffId:d.id,label:lbl,total:Math.round(lt),monthly:Math.round(lm),start:ls,paidBefore:Math.round(lpb),date:todayStr(),at:Date.now()}).then(function(){toast('เพิ่มเงินยืมแล้ว')});break}
     case 'loandel':{var lo=S.loans.find(function(x){return x.id===d.k});if(lo)del('loans/'+lo.id).then(function(){toast('ลบรายการยืมแล้ว')});break}
     case 'loanapprove':{var lo2=S.loans.find(function(x){return x.id===d.k});if(!lo2)break;var li=loanInfo(lo2,S.ym);if(!(li.suggest>0))break;var cl=calc(staffById(lo2.staffId),S.ym);
       patchPay(S.ym,lo2.staffId,{items:cl.items.concat([{label:'ผ่อนชำระ: '+lo2.label,amount:li.suggest,loan:lo2.id}])}).then(function(){toast('อนุมัติหัก ฿'+fmt(li.suggest)+' แล้ว')});break}
