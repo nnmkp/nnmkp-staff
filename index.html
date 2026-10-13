@@ -302,6 +302,8 @@ input,select,textarea{font-size:16px!important}
 .ndot{flex:none;width:9px;height:9px;border-radius:50%;background:#c0392b;margin-top:6px}
 .top{justify-content:flex-start;gap:10px}
 .top .who{margin-right:auto}
+.mlist{display:flex;flex-direction:column;gap:6px}
+.mlist .item{display:flex;justify-content:space-between;align-items:center;gap:8px}
 </style>
 </head>
 <body>
@@ -394,7 +396,7 @@ function calc(st,ym){
   var advs=S.adv.filter(function(a){return a.staffId===st.id&&a.status==='approved'&&a.ym===ym}).sort(function(a,b){return a.date<b.date?-1:1}).map(function(a){return {date:a.date,amount:+a.amount||0}});
   var advAmt=advs.reduce(function(x,a){return x+a.amount},0);
   var base=+st.base||0;
-  return {adv:advs,advAmt:advAmt,coverDates:coverDates,coverDays:coverDates.length,coverRate:cfg.otRate,coverAmt:coverAmt,off:off,extraDays:extraDays,extra:extra,rate:cfg.extraRate,mrate:cfg.mistakeRate,allowance:ai.eff,ai:ai,ot:ot,mistakes:mistakes,mAmt:mAmt,items:items,iAmt:iAmt,base:base,
+  return {adv:advs,advAmt:advAmt,coverDates:coverDates,coverDays:coverDates.length,coverRate:cfg.otRate,coverAmt:coverAmt,off:off,extraDays:extraDays,extra:extra,rate:cfg.extraRate,mlog:(p.mlog||[]),mrate:cfg.mistakeRate,allowance:ai.eff,ai:ai,ot:ot,mistakes:mistakes,mAmt:mAmt,items:items,iAmt:iAmt,base:base,
     net:base+extra+ot+coverAmt-mAmt-iAmt-advAmt,published:!!p.published,slip:p.slip||null};
 }
 
@@ -487,6 +489,7 @@ function notifs(){
       var pr=(a.proofs||[]).reduce(function(m,x){return Math.max(m,+x.at||0)},0);
       if(pr)out.push({k:'ap'+a.id,at:pr,tab:'adv',ico:'slip',title:'โอนเงินเบิกล่วงหน้าแล้ว',body:'โอนเงิน ฿'+fmt(a.amount)+' เรียบร้อย ดูสลิปโอนเงินได้ที่หน้าเบิกเงิน'})});
     Object.keys(S.pay).forEach(function(k){var p=S.pay[k];if(!p||p.staffId!==id||!p.ym)return;var mn=TH_M[+p.ym.split('-')[1]-1];
+      (p.mlog||[]).forEach(function(e){out.push({k:'pm'+e.id,at:+e.at||0,tab:'slip',ico:'slip',title:'บันทึกออเดอร์ผิด',body:dateShort(e.date)+(e.note?' · '+e.note:'')+' · หัก ฿'+fmt(C().mistakeRate),bad:true})});
       if(p.published&&p.slip&&p.slip.at)out.push({k:'ps'+k,at:p.slip.at,tab:'slip',ico:'slip',title:'สลิปเงินเดือนอนุมัติแล้ว',body:'สลิปเงินเดือน'+mn+' ออกแล้ว ยอดสุทธิ ฿'+fmt(p.slip.net)});
       var pr=(p.proofs||[]).reduce(function(m,x){return Math.max(m,+x.at||0)},0);
       if(pr)out.push({k:'pp'+k,at:pr,tab:'slip',ico:'slip',title:'โอนเงินเดือนแล้ว',body:'โอนเงินเดือน'+mn+' เรียบร้อย ดูสลิปโอนเงินได้ที่หน้าสลิปเงินเดือน'})});
@@ -616,7 +619,7 @@ function slipHtml(st,sl,ym){
 }
 
 function vSlip(st){
-  var c=calc(st,S.ym), h=navHtml();
+  var c=calc(st,S.ym), h=navHtml()+mistakeStaff(st);
   if(c.published&&c.slip)h+=slipHtml(st,c.slip,S.ym)+proofHtml(st.id,S.ym,false);
   else h+='<div class="card empty"><b>สลิปเดือน'+esc(TH_M[+S.ym.split('-')[1]-1])+'ยังไม่ออก</b></div>';
   return h;
@@ -935,7 +938,7 @@ function vPay(){
       +'<div class="neg"><dt>รายการหัก</dt><dd>−'+fmt(c.iAmt)+'</dd></div></dl>'
       +'<h3 class="sec">ปรับรายเดือน</h3>'
       +'<div class="ctl"><div class="cl"><b>สิทธิ์วันหยุด</b><span class="sub">'+aiTxt+'</span><span class="sub">หยุดไปแล้ว '+c.off+' วัน</span></div><div class="step"><button data-act="adj" data-d="-1" data-id="'+id+'" aria-label="ลดสิทธิ์วันหยุด">−</button><b title="ปรับสิทธิ์">'+(ai.adj>0?'+':'')+ai.adj+'</b><button data-act="adj" data-d="1" data-id="'+id+'" aria-label="เพิ่มสิทธิ์วันหยุด">+</button></div></div>'
-      +'<div class="ctl"><div class="cl"><b>ออเดอร์ผิด</b><span class="sub">ครั้งละ '+fmt(c.mrate)+' บาท</span></div><div class="step"><button data-act="mist" data-d="-1" data-id="'+id+'" aria-label="ลด">−</button><b>'+c.mistakes+'</b><button data-act="mist" data-d="1" data-id="'+id+'" aria-label="เพิ่ม">+</button></div></div>'
+      +mistakeAdmin(st,c)
       +'<div class="ctl"><div class="cl"><label for="ot-'+id+'"><b>OT เพิ่มเติม</b></label><span class="sub">บาท</span></div><input class="amt" id="ot-'+id+'" type="number" inputmode="numeric" min="0" value="'+c.ot+'" data-chg="ot" data-id="'+id+'"></div>'
       +advSection(st)
       +loanSection(st)
@@ -951,6 +954,23 @@ function vPay(){
   return h;
 }
 
+function mistakeAdmin(st,c){
+  var id=esc(st.id), log=(c.mlog||[]).slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(b.at||0)-(a.at||0)});
+  var legacy=Math.max(0,c.mistakes-log.length), dd=todayStr().indexOf(S.ym)===0?todayStr():S.ym+'-15';
+  var h='<h3 class="sec">ออเดอร์ผิด</h3><div class="ctl"><div class="cl"><b>เดือนนี้ '+c.mistakes+' ครั้ง</b><span class="sub">ครั้งละ '+fmt(c.mrate)+' บาท · หัก −'+fmt(c.mAmt)+'</span></div></div>'
+    +'<div class="addrow"><input id="mdt-'+id+'" type="date" value="'+esc(dd)+'" aria-label="วันที่ทำผิด"><input id="mn-'+id+'" type="text" style="text-align:left" placeholder="หมายเหตุ เช่น ลืมใส่ไข่" aria-label="หมายเหตุ"><button class="btn sm" data-act="mlogadd" data-id="'+id+'">บันทึก</button></div>';
+  if(log.length)h+='<div class="mlist">'+log.map(function(e){return '<div class="item"><span>'+esc(dateShort(e.date))+(e.note?' · '+esc(e.note):'')+'</span><button class="btn alt sm" data-act="mlogdel" data-id="'+id+'" data-k="'+esc(e.id)+'" aria-label="ลบรายการ">ลบ</button></div>'}).join('')+'</div>';
+  if(legacy)h+='<div class="item"><span class="sub">ยอดเดิมก่อนมีรายการ '+legacy+' ครั้ง (ไม่มีรายละเอียด)</span><button class="btn alt sm" data-act="mist" data-d="-1" data-id="'+id+'">ลด 1</button></div>';
+  return h;
+}
+function mistakeStaff(st){
+  var c=calc(st,S.ym); if(!c.mistakes)return '';
+  var log=(c.mlog||[]).slice().sort(function(a,b){return a.date<b.date?1:-1}), legacy=Math.max(0,c.mistakes-log.length);
+  return '<div class="card"><div class="ch"><div><b>ออเดอร์ผิด '+c.mistakes+' ครั้ง</b><div class="sub">ครั้งละ '+fmt(c.mrate)+' บาท</div></div><b style="color:var(--bad,#b3392b)">−฿'+fmt(c.mAmt)+'</b></div>'
+    +(log.length?'<div class="mlist">'+log.map(function(e){return '<div class="item"><span>'+esc(dateShort(e.date))+(e.note?' · '+esc(e.note):'')+'</span><span class="sub">−฿'+fmt(c.mrate)+'</span></div>'}).join('')+'</div>':'')
+    +(legacy?'<div class="note">ยอดเดิม '+legacy+' ครั้ง (ไม่มีรายละเอียด)</div>':'')
+    +'<div class="note">ยอดนี้จะรวมหักในสลิปเงินเดือนเมื่อผู้จัดการอนุมัติสลิป</div></div>';
+}
 function vSet(){
   var c=C(), h='<section class="card"><h3>PIN เข้าสู่ระบบของผู้จัดการ</h3><div class="sub">ตั้ง PIN 6 หลักเพื่อเข้าแอปด้วยปุ่มตัวเลขเหมือนพนักงาน (แทนรหัสผ่านเดิม)</div><div class="two"><div class="fld"><label for="mp1">PIN ใหม่ (6 หลัก)</label><input id="mp1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></div><div class="fld"><label for="mp2">ยืนยัน PIN</label><input id="mp2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></div></div><button class="btn" data-act="setmgrpin">ตั้ง PIN ผู้จัดการ</button></section>'
    +'<section class="card"><h3>กติกาเงินเดือน</h3><div class="two">'
@@ -1164,6 +1184,13 @@ document.addEventListener('click',function(e){
       patchPay(S.ym,d.id,{proofs:after}).then(function(){if(ASSETS)ASSETS.delete(d.pid).catch(function(){});toast('ลบสลิปโอนเงินแล้ว')});break}
     case 'adj':{var s5=staffById(d.id),c5=calc(s5,S.ym);patchPay(S.ym,d.id,{allowAdj:(+c5.ai.adj||0)+Number(d.d)});break}
     case 'mist':{var s4=staffById(d.id),c4=calc(s4,S.ym);patchPay(S.ym,d.id,{mistakes:Math.max(0,c4.mistakes+Number(d.d))});break}
+    case 'mlogadd':{
+      var s9=staffById(d.id),c9=calc(s9,S.ym),md=document.getElementById('mdt-'+d.id).value,mn=document.getElementById('mn-'+d.id).value.trim().slice(0,80);
+      if(!md||md.indexOf(S.ym)!==0){toast('เลือกวันที่ในเดือน '+ymLabel(S.ym));break}
+      var ent={id:'m'+Date.now().toString(36),date:md,note:mn,at:Date.now()};
+      patchPay(S.ym,d.id,{mistakes:c9.mistakes+1,mlog:(c9.mlog||[]).concat([ent])}).then(function(){toast('บันทึกออเดอร์ผิดแล้ว');var e2=document.getElementById('mn-'+d.id);if(e2)e2.value=''});break}
+    case 'mlogdel':{var s10=staffById(d.id),c10=calc(s10,S.ym);
+      patchPay(S.ym,d.id,{mistakes:Math.max(0,c10.mistakes-1),mlog:(c10.mlog||[]).filter(function(x){return x.id!==d.k})}).then(function(){toast('ลบรายการแล้ว')});break}
     case 'additem':{
       var amt=Number(document.getElementById('am-'+d.id).value), lab=document.getElementById('lb-'+d.id).value;
       if(!(amt>0)){toast('ใส่จำนวนเงินก่อน');break}
