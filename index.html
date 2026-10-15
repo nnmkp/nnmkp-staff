@@ -642,7 +642,7 @@ function advCard(a,showName){
   if(a.note)h+='<div class="note">'+esc(a.note)+'</div>';
   if(a.status==='pending')h+='<div class="row"><button class="btn sm" data-act="advapprove" data-k="'+esc(a.id)+'">อนุมัติ</button><button class="btn alt sm" data-act="advreject" data-k="'+esc(a.id)+'">ไม่อนุมัติ</button></div>';
   if(a.status==='approved'){
-    if(showName)h+='<div class="row"><button class="btn sm" data-act="copyadv" data-k="'+esc(a.id)+'">คัดลอกข้อความไลน์</button>'+(st&&String(st.accNo||'').replace(/\D/g,'')?'<button class="btn sm" data-act="copyacc" data-id="'+esc(st.id)+'">คัดลอกเลขบัญชี</button><button class="btn sm" data-act="copybank" data-id="'+esc(st.id)+'">คัดลอกธนาคาร+ชื่อ</button>':'')+'</div>';
+    if(showName)h+='<div class="row"><button class="btn sm" data-act="copyadv" data-k="'+esc(a.id)+'">คัดลอกข้อความไลน์</button><button class="btn sm" data-act="advimg" data-k="'+esc(a.id)+'">บันทึกเป็นรูป</button>'+(st&&String(st.accNo||'').replace(/\D/g,'')?'<button class="btn sm" data-act="copyacc" data-id="'+esc(st.id)+'">คัดลอกเลขบัญชี</button><button class="btn sm" data-act="copybank" data-id="'+esc(st.id)+'">คัดลอกธนาคาร+ชื่อ</button>':'')+'</div>';
     h+=advThumbs(a,true);
     if(!(a.proofs||[]).length)h+='<div class="note">ยังไม่ได้แนบสลิปโอนเงิน</div>';
     h+=(ASSETS?'<label class="btn alt sm filebtn" style="align-self:flex-start">แนบสลิปโอนเงิน<input type="file" accept="image/*,application/pdf" data-chg="aproof" data-k="'+esc(a.id)+'" aria-label="แนบสลิปโอนเงิน"></label>':'');
@@ -901,6 +901,36 @@ function proofHtml(sid,ym,edit){
   return h;
 }
 var dstrOf=function(ms){var d=new Date(ms);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+
+
+function advImage(a){
+  var st=staffById(a.staffId)||{}, pr=(a.proofs||[]).find(function(x){return !/pdf/i.test(x.type||'')});
+  var W=1080, M=60;
+  var tms=(a.proofs&&a.proofs[0]&&a.proofs[0].at)||a.decidedAt||0, tdate=tms?dateShort(dstrOf(tms)):dateShort(a.date);
+  var no=String(st.accNo||'').replace(/\D/g,''), nof=no.replace(/(\d{3})(\d)(\d{5})(\d)/,'$1-$2-$3-$4');
+  var loadSlip=(pr&&ASSETS)?ASSETS.signed(pr.id).then(function(u){return new Promise(function(res){var im=new Image();im.crossOrigin='anonymous';im.onload=function(){res(im)};im.onerror=function(){res(null)};im.src=u})}).catch(function(){return null}):Promise.resolve(null);
+  return Promise.all([loadSlip,document.fonts?Promise.all([document.fonts.load('400 40px Mitr'),document.fonts.load('500 40px "Noto Sans Thai"'),document.fonts.load('700 40px "Noto Sans Thai"')]).catch(function(){}):0]).then(function(r){
+    var slip=r[0], sh=0, sw=0;
+    if(slip){sw=Math.min(W-2*M,720);sh=Math.round(slip.height*sw/slip.width);if(sh>1100){sh=1100;sw=Math.round(slip.width*sh/slip.height)}}
+    var H=670+(slip?sh+80:0);
+    var cv=document.createElement('canvas');cv.width=W;cv.height=H;var g=cv.getContext('2d');
+    g.fillStyle='#fff3d9';g.fillRect(0,0,W,H);
+    g.fillStyle='#f79922';g.fillRect(0,0,W,130);
+    g.fillStyle='#fff';g.font='400 56px Mitr,"Noto Sans Thai",sans-serif';g.textBaseline='middle';g.fillText('NNMKP',M,65);
+    g.font='500 34px "Noto Sans Thai",sans-serif';g.textAlign='right';g.fillText('เบิกเงินค่าแรงล่วงหน้า',W-M,65);g.textAlign='left';
+    var y=190;
+    function row(k,v,big){if(big)y+=22;g.fillStyle='#6b5a4a';g.font='500 30px "Noto Sans Thai",sans-serif';g.fillText(k,M,y);g.fillStyle='#973b20';g.font=big?'400 76px Mitr,"Noto Sans Thai",sans-serif':'700 38px "Noto Sans Thai",sans-serif';g.textAlign='right';g.fillText(v,W-M,y);g.textAlign='left';y+=big?100:68}
+    row('พนักงาน',(st.name||'')+(st.branch?' ('+st.branch+')':''));
+    row('เดือน',ymLabel(a.ym));
+    row('วันที่โอน',tdate);
+    row('จำนวนเงิน','฿'+fmt(a.amount),true);
+    if(no){g.strokeStyle='#e8d3a8';g.lineWidth=2;g.beginPath();g.moveTo(M,y-20);g.lineTo(W-M,y-20);g.stroke();y+=10;
+      g.fillStyle='#6b5a4a';g.font='500 28px "Noto Sans Thai",sans-serif';g.fillText('บัญชีรับโอน',M,y);y+=50;
+      g.fillStyle='#973b20';g.font='700 34px "Noto Sans Thai",sans-serif';g.fillText(((st.bank||'')+' '+nof).trim(),M,y);y+=50;g.font='500 30px "Noto Sans Thai",sans-serif';g.fillText(st.accName||st.name||'',M,y);y+=40}
+    if(slip){y+=40;g.fillStyle='#fff';g.fillRect((W-sw)/2-10,y-10,sw+20,sh+20);g.drawImage(slip,(W-sw)/2,y,sw,sh)}
+    return new Promise(function(res,rej){cv.toBlob(function(b){b?res(b):rej()},'image/png')});
+  });
+}
 
 function copyText(t){
   var p=(navigator.clipboard&&navigator.clipboard.writeText)?navigator.clipboard.writeText(t):Promise.reject();
@@ -1181,6 +1211,11 @@ document.addEventListener('click',function(e){
     case 'copyacc':{var sc=staffById(d.id);if(!sc)break;copyText(String(sc.accNo||'').replace(/\D/g,'')).then(function(){toast('คัดลอกเลขบัญชีของ'+sc.name+'แล้ว')},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่เลขบัญชีเพื่อคัดลอก')});break}
     case 'copyadv':{var ca=S.adv.find(function(x){return x.id===d.k}),cs=ca&&staffById(ca.staffId);if(!cs)break;copyText(cs.name+' เบิกเงินค่าแรงล่วงหน้า\nเดือน '+ymLabel(ca.ym)+'\n'+fmt(ca.amount)+' บาท').then(function(){toast('คัดลอกแล้ว วางในไลน์ได้เลย')},function(){toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง')});break}
     case 'copybank':{var sb=staffById(d.id);if(!sb)break;copyText(((sb.bank||'')+' '+(sb.accName||sb.name)).trim()).then(function(){toast('คัดลอกธนาคารและชื่อบัญชีของ'+sb.name+'แล้ว')},function(){toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง')});break}
+    case 'advimg':{var ai2=S.adv.find(function(x){return x.id===d.k}),as2=ai2&&staffById(ai2.staffId);if(!as2)break;toast('กำลังสร้างรูป...');
+      advImage(ai2).then(function(b){var f=new File([b],'เบิก-'+as2.name+'-'+ai2.ym+'.png',{type:'image/png'});
+        if(navigator.canShare&&navigator.canShare({files:[f]}))return navigator.share({files:[f]}).catch(function(e){if(e&&e.name==='AbortError')return;throw e});
+        var u=URL.createObjectURL(b),an=document.createElement('a');an.href=u;an.download=f.name;document.body.appendChild(an);an.click();an.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000);toast('บันทึกรูปแล้ว')
+      }).catch(function(){toast('สร้างรูปไม่ได้ ลองใหม่อีกครั้ง')});break}
     case 'copymsg':{var sm=staffById(d.id);if(!sm)break;copyText(payMsg(sm,calc(sm,S.ym).net,S.ym)).then(function(){toast('คัดลอกข้อความโอนแล้ว วางในไลน์ได้เลย')},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่เลขบัญชีเพื่อคัดลอก')});break}
     case 'rmproof':{var s8=staffById(d.id),pp=S.pay[S.ym+'_'+d.id]||{};
       var after=(pp.proofs||[]).filter(function(x){return x.id!==d.pid});
