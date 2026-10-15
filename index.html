@@ -642,7 +642,7 @@ function advCard(a,showName){
   if(a.note)h+='<div class="note">'+esc(a.note)+'</div>';
   if(a.status==='pending')h+='<div class="row"><button class="btn sm" data-act="advapprove" data-k="'+esc(a.id)+'">อนุมัติ</button><button class="btn alt sm" data-act="advreject" data-k="'+esc(a.id)+'">ไม่อนุมัติ</button></div>';
   if(a.status==='approved'){
-    if(showName)h+='<div class="row"><button class="btn sm" data-act="copyadv" data-k="'+esc(a.id)+'">คัดลอกข้อความไลน์</button><button class="btn sm" data-act="advimg" data-k="'+esc(a.id)+'">บันทึกเป็นรูป</button>'+(st&&String(st.accNo||'').replace(/\D/g,'')?'<button class="btn sm" data-act="copyacc" data-id="'+esc(st.id)+'">คัดลอกเลขบัญชี</button><button class="btn sm" data-act="copybank" data-id="'+esc(st.id)+'">คัดลอกธนาคาร+ชื่อ</button>':'')+'</div>';
+    h+='<div class="row"><button class="btn sm" data-act="copyadv" data-k="'+esc(a.id)+'">คัดลอกข้อความไลน์</button><button class="btn sm" data-act="advimg" data-k="'+esc(a.id)+'">บันทึกเป็นรูป</button>'+(st&&String(st.accNo||'').replace(/\D/g,'')?'<button class="btn sm" data-act="copyacc" data-id="'+esc(st.id)+'">คัดลอกเลขบัญชี</button><button class="btn sm" data-act="copybank" data-id="'+esc(st.id)+'">คัดลอกธนาคาร+ชื่อ</button>':'')+'</div>';
     h+=advThumbs(a,true);
     if(!(a.proofs||[]).length)h+='<div class="note">ยังไม่ได้แนบสลิปโอนเงิน</div>';
     h+=(ASSETS?'<label class="btn alt sm filebtn" style="align-self:flex-start">แนบสลิปโอนเงิน<input type="file" accept="image/*,application/pdf" data-chg="aproof" data-k="'+esc(a.id)+'" aria-label="แนบสลิปโอนเงิน"></label>':'');
