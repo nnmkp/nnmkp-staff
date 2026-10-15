@@ -642,7 +642,7 @@ function advCard(a,showName){
   if(a.note)h+='<div class="note">'+esc(a.note)+'</div>';
   if(a.status==='pending')h+='<div class="row"><button class="btn sm" data-act="advapprove" data-k="'+esc(a.id)+'">อนุมัติ</button><button class="btn alt sm" data-act="advreject" data-k="'+esc(a.id)+'">ไม่อนุมัติ</button></div>';
   if(a.status==='approved'){
-    if(showName)h+='<div class="row"><button class="btn sm" data-act="copyadv" data-k="'+esc(a.id)+'">คัดลอกข้อความไลน์</button></div>';
+    if(showName)h+='<div class="row"><button class="btn sm" data-act="copyadv" data-k="'+esc(a.id)+'">คัดลอกข้อความไลน์</button>'+(st&&String(st.accNo||'').replace(/\D/g,'')?'<button class="btn sm" data-act="copyacc" data-id="'+esc(st.id)+'">คัดลอกเลขบัญชี</button><button class="btn sm" data-act="copybank" data-id="'+esc(st.id)+'">คัดลอกธนาคาร+ชื่อ</button>':'')+'</div>';
     h+=advThumbs(a,true);
     if(!(a.proofs||[]).length)h+='<div class="note">ยังไม่ได้แนบสลิปโอนเงิน</div>';
     h+=(ASSETS?'<label class="btn alt sm filebtn" style="align-self:flex-start">แนบสลิปโอนเงิน<input type="file" accept="image/*,application/pdf" data-chg="aproof" data-k="'+esc(a.id)+'" aria-label="แนบสลิปโอนเงิน"></label>':'');
@@ -915,7 +915,7 @@ function bankBox(st,net){
   if(!no)return '<div class="advc"><b>บัญชีรับโอน</b><div class="note">ยังไม่ได้ใส่เลขบัญชี ใส่ได้ที่แท็บ ตั้งค่า → '+esc(st.name)+'</div></div>';
   return '<div class="advc"><div class="ch"><b>บัญชีรับโอน</b><span class="sub">ยอดโอน ฿'+fmt(net)+'</span></div>'
     +'<div class="bank"><div class="sub">'+esc(st.bank||'ไม่ระบุธนาคาร')+'</div><div class="accno" id="acc-'+id+'">'+esc(no.replace(/(\d{3})(\d)(\d{5})(\d)/,'$1-$2-$3-$4'))+'</div><div>'+esc(st.accName||st.name)+'</div></div>'
-    +'<div class="row"><button class="btn sm" data-act="copyacc" data-id="'+id+'">คัดลอกเลขบัญชี</button><button class="btn alt sm" data-act="copymsg" data-id="'+id+'">คัดลอกข้อความโอน</button></div></div>';
+    +'<div class="row"><button class="btn sm" data-act="copyacc" data-id="'+id+'">คัดลอกเลขบัญชี</button><button class="btn sm" data-act="copybank" data-id="'+id+'">คัดลอกธนาคาร+ชื่อ</button><button class="btn alt sm" data-act="copymsg" data-id="'+id+'">คัดลอกข้อความโอน</button></div></div>';
 }
 
 function vPay(){
@@ -1179,7 +1179,8 @@ document.addEventListener('click',function(e){
     case 'loanapprove':{var lo2=S.loans.find(function(x){return x.id===d.k});if(!lo2)break;var li=loanInfo(lo2,S.ym);if(!(li.suggest>0))break;var cl=calc(staffById(lo2.staffId),S.ym);
       patchPay(S.ym,lo2.staffId,{items:cl.items.concat([{label:'ผ่อนชำระ: '+lo2.label,amount:li.suggest,loan:lo2.id}])}).then(function(){toast('อนุมัติหัก ฿'+fmt(li.suggest)+' แล้ว')});break}
     case 'copyacc':{var sc=staffById(d.id);if(!sc)break;copyText(String(sc.accNo||'').replace(/\D/g,'')).then(function(){toast('คัดลอกเลขบัญชีของ'+sc.name+'แล้ว')},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่เลขบัญชีเพื่อคัดลอก')});break}
-    case 'copyadv':{var ca=S.adv.find(function(x){return x.id===d.k}),cs=ca&&staffById(ca.staffId);if(!cs)break;copyText(cs.name+' เบิกล่วงหน้า ค่าแรง '+TH_M[+ca.ym.split('-')[1]-1]+' '+fmt(ca.amount)).then(function(){toast('คัดลอกแล้ว วางในไลน์ได้เลย')},function(){toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง')});break}
+    case 'copyadv':{var ca=S.adv.find(function(x){return x.id===d.k}),cs=ca&&staffById(ca.staffId);if(!cs)break;copyText(cs.name+' เบิกเงินค่าแรงล่วงหน้าเดือน '+ymLabel(ca.ym)).then(function(){toast('คัดลอกแล้ว วางในไลน์ได้เลย')},function(){toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง')});break}
+    case 'copybank':{var sb=staffById(d.id);if(!sb)break;copyText(((sb.bank||'')+' '+(sb.accName||sb.name)).trim()).then(function(){toast('คัดลอกธนาคารและชื่อบัญชีของ'+sb.name+'แล้ว')},function(){toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง')});break}
     case 'copymsg':{var sm=staffById(d.id);if(!sm)break;copyText(payMsg(sm,calc(sm,S.ym).net,S.ym)).then(function(){toast('คัดลอกข้อความโอนแล้ว วางในไลน์ได้เลย')},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่เลขบัญชีเพื่อคัดลอก')});break}
     case 'rmproof':{var s8=staffById(d.id),pp=S.pay[S.ym+'_'+d.id]||{};
       var after=(pp.proofs||[]).filter(function(x){return x.id!==d.pid});
