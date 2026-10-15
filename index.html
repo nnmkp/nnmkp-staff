@@ -910,28 +910,37 @@ function advImage(a){
   var no=String(st.accNo||'').replace(/\D/g,''), nof=no.replace(/(\d{3})(\d)(\d{5})(\d)/,'$1-$2-$3-$4');
   var loadSlip=(pr&&ASSETS)?ASSETS.signed(pr.id).then(function(u){return new Promise(function(res){var im=new Image();im.crossOrigin='anonymous';im.onload=function(){res(im)};im.onerror=function(){res(null)};im.src=u})}).catch(function(){return null}):Promise.resolve(null);
   return Promise.all([loadSlip,document.fonts?Promise.all([document.fonts.load('400 40px Mitr'),document.fonts.load('500 40px "Noto Sans Thai"'),document.fonts.load('700 40px "Noto Sans Thai"')]).catch(function(){}):0]).then(function(r){
-    var slip=r[0], sh=0, sw=0;
-    if(slip){sw=Math.min(W-2*M,720);sh=Math.round(slip.height*sw/slip.width);if(sh>1100){sh=1100;sw=Math.round(slip.width*sh/slip.height)}}
-    var H=670+(slip?sh+80:0);
+    var slip=r[0], sh=0, sw=0, sx=0, sy=0, cw=0, ch=0;
+    if(slip){
+      cw=slip.naturalWidth||slip.width;ch=slip.naturalHeight||slip.height;
+      /* ตัดพื้นที่ว่างสีขาวด้านล่างของสลิปออก */
+      try{var tc=document.createElement('canvas'),k=Math.min(1,600/cw);tc.width=Math.round(cw*k);tc.height=Math.round(ch*k);var tg=tc.getContext('2d');tg.drawImage(slip,0,0,tc.width,tc.height);
+        var px=tg.getImageData(0,0,tc.width,tc.height).data,last=0;
+        for(var yy=0;yy<tc.height;yy++){for(var xx=0;xx<tc.width;xx+=2){var o=(yy*tc.width+xx)*4;if(px[o+3]>0&&(px[o]+px[o+1]+px[o+2])/3<150){last=yy;break}}}
+        if(last>tc.height*0.25)ch=Math.min(ch,Math.round((last+24)/k))}catch(e){}
+      sw=Math.min(W-2*M,640);sh=Math.round(ch*sw/cw);if(sh>800){sh=800;sw=Math.round(cw*sh/ch)}
+    }
+    var H=660+(slip?sh+70:0);
     var cv=document.createElement('canvas');cv.width=W;cv.height=H;var g=cv.getContext('2d');
+    g.textAlign='left';g.textBaseline='middle';
+    function put(t,x,yv,right){if(right)x=x-g.measureText(t).width;g.fillText(t,x,yv)}
     g.fillStyle='#fff3d9';g.fillRect(0,0,W,H);
     g.fillStyle='#f79922';g.fillRect(0,0,W,130);
-    g.fillStyle='#fff';g.font='400 56px Mitr,"Noto Sans Thai",sans-serif';g.textBaseline='middle';g.fillText('NNMKP',M,65);
-    g.font='500 34px "Noto Sans Thai",sans-serif';g.textAlign='right';g.fillText('เบิกเงินค่าแรงล่วงหน้า',W-M,65);g.textAlign='left';
+    g.fillStyle='#fff';g.font='400 56px Mitr,"Noto Sans Thai",sans-serif';put('NNMKP',M,65);
+    g.font='500 32px "Noto Sans Thai",sans-serif';put('เบิกเงินค่าแรงล่วงหน้า',W-M,65,true);
     var y=190;
-    function row(k,v,big){if(big)y+=22;g.fillStyle='#6b5a4a';g.font='500 30px "Noto Sans Thai",sans-serif';g.fillText(k,M,y);g.fillStyle='#973b20';g.font=big?'400 76px Mitr,"Noto Sans Thai",sans-serif':'700 38px "Noto Sans Thai",sans-serif';g.textAlign='right';g.fillText(v,W-M,y);g.textAlign='left';y+=big?100:68}
+    function row(k,v,big){if(big)y+=22;g.fillStyle='#6b5a4a';g.font='500 30px "Noto Sans Thai",sans-serif';put(k,M,y);g.fillStyle='#973b20';g.font=big?'400 76px Mitr,"Noto Sans Thai",sans-serif':'700 38px "Noto Sans Thai",sans-serif';put(v,W-M,y,true);y+=big?100:68}
     row('พนักงาน',(st.name||'')+(st.branch?' ('+st.branch+')':''));
     row('เดือน',ymLabel(a.ym));
     row('วันที่โอน',tdate);
     row('จำนวนเงิน','฿'+fmt(a.amount),true);
     if(no){g.strokeStyle='#e8d3a8';g.lineWidth=2;g.beginPath();g.moveTo(M,y-20);g.lineTo(W-M,y-20);g.stroke();y+=10;
-      g.fillStyle='#6b5a4a';g.font='500 28px "Noto Sans Thai",sans-serif';g.fillText('บัญชีรับโอน',M,y);y+=50;
-      g.fillStyle='#973b20';g.font='700 34px "Noto Sans Thai",sans-serif';g.fillText(((st.bank||'')+' '+nof).trim(),M,y);y+=50;g.font='500 30px "Noto Sans Thai",sans-serif';g.fillText(st.accName||st.name||'',M,y);y+=40}
-    if(slip){y+=40;g.fillStyle='#fff';g.fillRect((W-sw)/2-10,y-10,sw+20,sh+20);g.drawImage(slip,(W-sw)/2,y,sw,sh)}
-    return new Promise(function(res,rej){cv.toBlob(function(b){b?res(b):rej()},'image/png')});
+      g.fillStyle='#6b5a4a';g.font='500 28px "Noto Sans Thai",sans-serif';put('บัญชีรับโอน',M,y);y+=50;
+      g.fillStyle='#973b20';g.font='700 34px "Noto Sans Thai",sans-serif';put(((st.bank||'')+' '+nof).trim(),M,y);y+=50;g.font='500 30px "Noto Sans Thai",sans-serif';put(st.accName||st.name||'',M,y);y+=40}
+    if(slip){y+=40;g.fillStyle='#fff';g.fillRect((W-sw)/2-10,y-10,sw+20,sh+20);g.drawImage(slip,0,0,cw,ch,(W-sw)/2,y,sw,sh)}
+    return new Promise(function(res,rej){cv.toBlob(function(b){b?res(b):rej()},'image/jpeg',0.9)});
   });
 }
-
 function copyText(t){
   var p=(navigator.clipboard&&navigator.clipboard.writeText)?navigator.clipboard.writeText(t):Promise.reject();
   return p.catch(function(){return new Promise(function(res,rej){var ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();ok?res():rej()})});
@@ -1212,7 +1221,7 @@ document.addEventListener('click',function(e){
     case 'copyadv':{var ca=S.adv.find(function(x){return x.id===d.k}),cs=ca&&staffById(ca.staffId);if(!cs)break;copyText(cs.name+' เบิกเงินค่าแรงล่วงหน้า\nเดือน '+ymLabel(ca.ym)+'\n'+fmt(ca.amount)+' บาท').then(function(){toast('คัดลอกแล้ว วางในไลน์ได้เลย')},function(){toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง')});break}
     case 'copybank':{var sb=staffById(d.id);if(!sb)break;copyText(((sb.bank||'')+' '+(sb.accName||sb.name)).trim()).then(function(){toast('คัดลอกธนาคารและชื่อบัญชีของ'+sb.name+'แล้ว')},function(){toast('คัดลอกไม่ได้ ลองใหม่อีกครั้ง')});break}
     case 'advimg':{var ai2=S.adv.find(function(x){return x.id===d.k}),as2=ai2&&staffById(ai2.staffId);if(!as2)break;toast('กำลังสร้างรูป...');
-      advImage(ai2).then(function(b){var f=new File([b],'เบิก-'+as2.name+'-'+ai2.ym+'.png',{type:'image/png'});
+      advImage(ai2).then(function(b){var f=new File([b],'เบิก-'+as2.name+'-'+ai2.ym+'.jpg',{type:'image/jpeg'});
         if(navigator.canShare&&navigator.canShare({files:[f]}))return navigator.share({files:[f]}).catch(function(e){if(e&&e.name==='AbortError')return;throw e});
         var u=URL.createObjectURL(b),an=document.createElement('a');an.href=u;an.download=f.name;document.body.appendChild(an);an.click();an.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000);toast('บันทึกรูปแล้ว')
       }).catch(function(){toast('สร้างรูปไม่ได้ ลองใหม่อีกครั้ง')});break}
