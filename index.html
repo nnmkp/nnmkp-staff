@@ -364,6 +364,8 @@ function helpOf(o){var h=o.helpId&&staffById(o.helpId);return(h&&h.id!==o.staffI
 function helpOT(o){var h=helpOf(o),m=h&&mateOf(h),mo=m&&offOf(m.id,o.date);return(m&&m.id!==o.staffId&&!(mo&&mo.status==='approved'))?m.id:null}
 function helpHours(o){return(o.helpStart||'10:00')+'–'+(o.helpEnd||'21:00')}
 function coverIds(o){var a=[],c=coverOf(o),m=helpOT(o);if(c)a.push(c);if(m&&a.indexOf(m)<0)a.push(m);return a}
+function rolesOf(o){var r=[];if(!o||o.status!=='approved')return r;var c=coverOf(o),h=helpOf(o),m=helpOT(o);if(c)r.push(c+':cover');if(h)r.push(h.id+':help');if(m&&m!==c)r.push(m+':cover2');return r}
+function withRm(oldO,newO){var a=rolesOf(oldO),b=rolesOf(newO),rm=a.filter(function(x){return b.indexOf(x)<0}).map(function(x){var p=x.split(':');return {sid:p[0],kind:p[1],at:Date.now()}});if(rm.length)newO.rm=rm;else delete newO.rm;return newO}
 function coveredOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.status==='approved'&&coverIds(o).indexOf(sid)>=0})}
 function helpingOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.status==='approved'&&o.helpId===sid&&helpOf(o)})}
 function mateOf(st){return S.staff.find(function(s){return s.branch===st.branch&&s.id!==st.id})}
@@ -515,6 +517,13 @@ function notifs(){
       out.push({k:'nc'+n.id,at:+n.at||0,tab:'cal',ico:'cal',title:'ผู้จัดการยกเลิกวันหยุด',body:'วันหยุดวันที่ '+dateShort(n.date)+' ถูกยกเลิก',bad:true})});
     S.off.filter(function(o){return o.staffId===id&&o.decidedAt}).forEach(function(o){var ok=o.status==='approved';
       out.push({k:'od'+o.id,at:o.decidedAt,tab:'cal',ico:'cal',title:ok?'อนุมัติวันหยุดแล้ว':'ไม่อนุมัติวันหยุด',body:ok?'วันหยุดวันที่ '+dateShort(o.date)+' ได้รับการอนุมัติ':'คำขอหยุดวันที่ '+dateShort(o.date)+' ไม่ได้รับการอนุมัติ',bad:!ok})});
+    S.off.filter(function(o){return o.status==='approved'&&o.staffId!==id}).forEach(function(o){var os=staffById(o.staffId),hp=helpOf(o);if(!os)return;var at=+o.assignAt||+o.decidedAt||+o.at||0;
+      if(coverIds(o).indexOf(id)>=0){var viaH=helpOT(o)===id&&coverOf(o)!==id;
+        out.push({k:'oc'+o.id,at:at,tab:'cal',ico:'cal',title:'ต้องทำ OT',body:'วันที่ '+dateShort(o.date)+' '+(viaH?hp.name+' โยกไปสาขา '+os.branch:os.name+' ('+os.branch+') หยุด')+' คุณทำแทนทั้งวัน ได้ OT ฿'+fmt(C().otRate)})}
+      if(hp&&hp.id===id)out.push({k:'oh'+o.id,at:at,tab:'cal',ico:'cal',title:'ถูกโยกไปช่วยอีกสาขา',body:'วันที่ '+dateShort(o.date)+' โยกไปช่วยสาขา '+os.branch+' เวลา '+helpHours(o)+' ('+os.name+' หยุด) ไม่ได้ OT'})});
+    S.off.forEach(function(o){(o.rm||[]).forEach(function(x){if(x.sid!==id)return;var os=staffById(o.staffId);
+      out.push({k:'or'+o.id+x.kind,at:+x.at||0,tab:'cal',ico:'cal',bad:true,title:x.kind==='help'?'ยกเลิกการโยกไปช่วย':'ยกเลิก OT',
+        body:'วันที่ '+dateShort(o.date)+(x.kind==='help'?' ไม่ต้องไปช่วยสาขาอื่นแล้ว ทำงานสาขาเดิมตามปกติ':x.kind==='cover2'?' ไม่ต้องทำแทนทั้งวันแล้ว (ไม่ได้ OT)':(os?' ไม่ต้องทำแทน '+os.name+' แล้ว':' ไม่ต้องทำแทนแล้ว')+' (ไม่ได้ OT)')})})});
     S.adv.filter(function(a){return a.staffId===id}).forEach(function(a){
       if(a.decidedAt&&(a.status==='approved'||a.status==='rejected')){var ok=a.status==='approved';
         out.push({k:'ad'+a.id,at:a.decidedAt,tab:'adv',ico:'pay',title:ok?'อนุมัติการเบิกเงินแล้ว':'ไม่อนุมัติการเบิกเงิน',body:ok?'คำขอเบิก ฿'+fmt(a.amount)+' ได้รับการอนุมัติ รอรับเงินโอน':'คำขอเบิก ฿'+fmt(a.amount)+' ไม่ได้รับการอนุมัติ',bad:!ok})}
@@ -1353,13 +1362,14 @@ document.addEventListener('change',function(e){
   else if(k==='cfg'){var v=Math.max(0,Number(t.value)||0);
     var o=Object.assign({},C());o[f]=v;save('settings/config',o)}
   else if(k==='adj')patchPay(S.ym,id,{allowAdj:Math.round(Number(t.value)||0)});
-  else if(k==='cover'){var od=S.off.find(function(x){return x.id===t.dataset.k});if(!od)return;var b2=Object.assign({},od);delete b2.id;if(t.value==='auto')delete b2.coverId;else b2.coverId=t.value;save('dayoffs/'+od.id,b2).then(function(){toast('เปลี่ยนผู้ทำแทนแล้ว')})}
+  else if(k==='cover'){var od=S.off.find(function(x){return x.id===t.dataset.k});if(!od)return;var b2=Object.assign({},od);delete b2.id;if(t.value==='auto')delete b2.coverId;else b2.coverId=t.value;b2.assignAt=Date.now();withRm(od,b2);save('dayoffs/'+od.id,b2).then(function(){toast('เปลี่ยนผู้ทำแทนแล้ว')})}
   else if(k==='help'){var oh=S.off.find(function(x){return x.id===t.dataset.k});if(!oh)return;var b3=Object.assign({},oh);delete b3.id;
-    if(!t.value){delete b3.helpId;delete b3.helpStart;delete b3.helpEnd}
+    if(!t.value){delete b3.helpId;delete b3.helpStart;delete b3.helpEnd;b3.assignAt=Date.now()}
     else{var hs=staffById(t.value);if(!hs)return;var hoff=offOf(hs.id,oh.date);
       if(hoff&&hoff.status==='approved'){toast(hs.name+' หยุดวันนี้อยู่ โยกไม่ได้');render();return}
       var hm=mateOf(hs),hmo=hm&&offOf(hm.id,oh.date);
-      b3.helpId=hs.id;b3.helpStart='10:00';b3.helpEnd='21:00'}
+      b3.helpId=hs.id;b3.helpStart='10:00';b3.helpEnd='21:00';b3.assignAt=Date.now()}
+    withRm(oh,b3);
     save('dayoffs/'+oh.id,b3).then(function(){toast(t.value?'โยก '+staffById(t.value).name+' มาช่วยแล้ว'+(hm?' · '+hm.name+' ทำทั้งวัน ได้ OT'+(hmo&&hmo.status==='approved'?' (แต่ '+hm.name+' หยุดวันนี้ ไม่ได้ OT)':''):''):'ยกเลิกการโยกแล้ว')})}
   else if(k==='plan'){var o2=Object.assign({},C());o2.mouPlan=Object.assign({},o2.mouPlan);o2.mouPlan[f]=Math.max(0,Number(t.value)||0);save('settings/config',o2)}
   else if(k==='staff'){var s=staffById(id);if(!s)return;var v2=t.value;
