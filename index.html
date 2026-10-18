@@ -110,6 +110,9 @@ body{overflow-x:clip}
 .cal button.blk{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
 .cal button.blk.sel{background:var(--accent);color:var(--accent-ink)}
 .legend .bk{background:var(--bad-soft);border-color:var(--bad)}
+.cal button.help{background:#e3ecf7;color:#2c5a8c;border-color:#9db9d9}
+.legend .hp{background:#e3ecf7;border-color:#9db9d9}
+.chip.help{background:#e3ecf7;color:#2c5a8c}
 .cal button.cover{background:var(--ok-soft);color:var(--ok)}
 .cal button.rejected{background:var(--bad-soft);color:var(--bad)}
 /* today = rust ring + rust number; selected = solid orange fill. They never look alike. */
@@ -357,7 +360,12 @@ function coverOf(o){
   if(o.coverId&&o.coverId!==o.staffId&&staffById(o.coverId))return o.coverId;
   var m=mateOf(st); return m?m.id:null;
 }
-function coveredOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.status==='approved'&&coverOf(o)===sid})}
+function helpOf(o){var h=o.helpId&&staffById(o.helpId);return(h&&h.id!==o.staffId)?h:null}
+function helpOT(o){var h=helpOf(o),m=h&&mateOf(h),mo=m&&offOf(m.id,o.date);return(m&&m.id!==o.staffId&&!(mo&&mo.status==='approved'))?m.id:null}
+function helpHours(o){return(o.helpStart||'10:00')+'–'+(o.helpEnd||'21:00')}
+function coverIds(o){var a=[],c=coverOf(o),m=helpOT(o);if(c)a.push(c);if(m&&a.indexOf(m)<0)a.push(m);return a}
+function coveredOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.status==='approved'&&coverIds(o).indexOf(sid)>=0})}
+function helpingOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.status==='approved'&&o.helpId===sid&&helpOf(o)})}
 function mateOf(st){return S.staff.find(function(s){return s.branch===st.branch&&s.id!==st.id})}
 function takenBy(sid,date){return S.off.find(function(o){return o.staffId!==sid&&o.date===date&&o.status==='approved'})}
 function blockedOn(ds){var b=C().blocked||{};return Object.prototype.hasOwnProperty.call(b,ds)?{note:b[ds]||''}:null}
@@ -412,7 +420,7 @@ function calc(st,ym){
   var cfg=C();
   var off=S.off.filter(function(o){return o.staffId===st.id&&o.status==='approved'&&o.date.indexOf(ym)===0}).length;
   var p=S.pay[ym+'_'+st.id]||{};
-  var coverDates=S.off.filter(function(o){return o.status==='approved'&&o.date.indexOf(ym)===0&&coverOf(o)===st.id}).map(function(o){return o.date}).sort();
+  var coverDates=S.off.filter(function(o){return o.status==='approved'&&o.date.indexOf(ym)===0&&coverIds(o).indexOf(st.id)>=0}).map(function(o){return o.date}).sort();
   var coverAmt=coverDates.length*cfg.otRate;
   var ai=allowInfo(st,ym), extraDays=Math.max(0,ai.eff-off), extra=extraDays*cfg.extraRate;
   var ot=+p.ot||0, mistakes=+p.mistakes||0, items=p.items||[];
@@ -591,12 +599,13 @@ function vCal(st){
     var ds=dstr(y,m,d), mine=offOf(st.id,ds), cls='', tx='';
     if(mine){cls=mine.status==='approved'?'off':mine.status==='pending'?'pending':'rejected';tx=mine.status==='approved'?'หยุด':mine.status==='pending'?'รออนุมัติ':'ไม่ผ่าน'}
     else if(coveredOn(st.id,ds)){cls='cover';tx='OT'}
+    else if(helpingOn(st.id,ds)){cls='help';tx='ช่วย'}
     else if(blockedOn(ds)&&ds>=today){cls='blk';tx='ห้าม'}
     else if(takenBy(st.id,ds)&&ds>=today){cls='taken';tx='เต็ม'}
     if(!tx&&ds===today)tx='วันนี้';
     h+='<button class="'+cls+(ds===today?' today':'')+(ds===S.sel?' sel':'')+'" data-act="seldate" data-d="'+ds+'"><span class="d">'+d+'</span><span class="t">'+tx+'</span></button>';
   }
-  h+='</div><div class="legend"><span><i style="border:2px solid var(--brand2)"></i>วันนี้</span><span><i style="background:var(--accent);border-color:var(--accent)"></i>วันที่เลือก</span><span><i style="background:var(--off)"></i>หยุด</span><span><i style="background:var(--warn-soft)"></i>รออนุมัติ</span><span><i style="background:var(--ok-soft)"></i>OT (ทำแทน)</span><span><i class="tk"></i>เต็ม (มีคนหยุดแล้ว)</span><span><i class="bk"></i>ห้ามหยุด</span></div>';
+  h+='</div><div class="legend"><span><i style="border:2px solid var(--brand2)"></i>วันนี้</span><span><i style="background:var(--accent);border-color:var(--accent)"></i>วันที่เลือก</span><span><i style="background:var(--off)"></i>หยุด</span><span><i style="background:var(--warn-soft)"></i>รออนุมัติ</span><span><i style="background:var(--ok-soft)"></i>OT (ทำแทน)</span><span><i class="tk"></i>เต็ม (มีคนหยุดแล้ว)</span><span><i class="bk"></i>ห้ามหยุด</span><span><i class="hp"></i>โยกไปช่วยสาขาอื่น</span></div>';
   var c=calc(st,S.ym);
   h+='<div class="card"><div class="row" style="justify-content:space-between"><span>หยุดแล้วเดือนนี้</span><b>'+c.off+' / '+c.allowance+' วัน</b></div>'+((c.ai.carry+c.ai.adj)<0?'<div class="note">สิทธิ์เดือนนี้เหลือ '+c.ai.eff+' วัน เพราะหยุดเกินสิทธิ์ก่อนหน้า</div>':'')+'<div class="row" style="justify-content:space-between"><span>OT ทำแทนเดือนนี้</span><b>'+c.coverDays+' วัน · ฿'+fmt(c.coverAmt)+'</b></div></div>';
   if(S.sel&&S.sel.indexOf(S.ym)===0){
@@ -605,7 +614,10 @@ function vCal(st){
     if(mine2&&mine2.status==='approved')body+='<div>คุณหยุด'+(function(){var cid=coverOf(mine2),cs=cid&&staffById(cid);return cs?' · '+esc(cs.name)+' ได้ OT ทำแทนทั้งวัน':''})()+'</div>';
     else if(mine2&&mine2.status==='pending')body+='<div class="pill warn" style="align-self:flex-start">รอผู้จัดการอนุมัติ</div>';
     else if(mine2&&mine2.status==='rejected')body+='<div class="pill" style="align-self:flex-start">ผู้จัดการไม่อนุมัติวันนี้</div>';
-    else if(coveredOn(st.id,ds2)){var cov=coveredOn(st.id,ds2),offS=staffById(cov.staffId);body+='<div><b>OT +฿'+fmt(C().otRate)+'</b> · '+esc(offS.name)+' หยุด คุณทำทั้งวัน '+esc(coverHours(st,offS))+'</div>'}
+    else if(helpingOn(st.id,ds2)){var ho=helpingOn(st.id,ds2),hos=staffById(ho.staffId);body+='<div><b>โยกไปช่วยสาขา '+esc(hos?hos.branch:'')+'</b> · '+esc(helpHours(ho))+' <span class="sub">(ไม่ได้ OT)</span></div>'}
+    else if(coveredOn(st.id,ds2)){var cov=coveredOn(st.id,ds2),offS=staffById(cov.staffId),hlp=helpOf(cov);
+      if(helpOT(cov)===st.id&&coverOf(cov)!==st.id)body+='<div><b>OT +฿'+fmt(C().otRate)+'</b> · '+esc(hlp.name)+' โยกไปสาขา '+esc(offS?offS.branch:'')+' คุณทำทั้งวัน '+esc(coverHours(st,hlp))+'</div>';
+      else body+='<div><b>OT +฿'+fmt(C().otRate)+'</b> · '+esc(offS.name)+' หยุด คุณทำทั้งวัน '+esc(coverHours(st,offS))+(hlp?' <span class="sub">('+esc(hlp.name)+' มาช่วยตามเวลา '+esc(helpHours(cov))+')</span>':'')+'</div>'}
     else body+='<div>ทำงานปกติ '+esc(st.start+'–'+st.end)+'</div>';
     var acts='';
     if(!past){
@@ -835,9 +847,11 @@ function vSchedCal(){
       var oc='<span class="chip '+(s.branch==='SPK'?'spk':'twn')+(o.status==='pending'?' pend':'')+'">'+esc(s.name)+'</span>',cc='';
       if(o.status==='approved'){var cid=coverOf(o),mt=cid&&staffById(cid);if(mt)cc='<span class="chip ot" title="OT ทำแทน">'+esc(mt.name)+'</span>'}
       chips+=cc?'<span class="pair">'+oc+cc+'</span>':oc});
+    S.off.forEach(function(o){if(o.date!==ds||o.status!=='approved')return;var hp=helpOf(o);if(!hp)return;var m2=staffById(helpOT(o)),os=staffById(o.staffId);
+      chips+='<span class="chip help" title="โยกไปช่วย">'+esc(hp.name)+'</span>'+(m2?'<span class="chip ot" title="OT ทำแทน">'+esc(m2.name)+'</span>':'')});
     h+='<button class="'+(ds===today?'today':'')+(!ps&&ds===S.msel?' sel':'')+(mine?' mine':'')+'" data-act="mseldate" data-d="'+ds+'"><span class="d">'+d+'</span>'+chips+'</button>';
   }
-  h+='</div><div class="legend"><span><span class="chip spk">SPK</span></span><span><span class="chip twn">TWN</span></span><span><span class="chip spk pend">รออนุมัติ</span></span><span><span class="chip ot">OT ทำแทน</span></span></div>';
+  h+='</div><div class="legend"><span><span class="chip spk">SPK</span></span><span><span class="chip twn">TWN</span></span><span><span class="chip spk pend">รออนุมัติ</span></span><span><span class="chip ot">OT ทำแทน</span></span><span><span class="chip help">โยกไปช่วย</span></span></div>';
   h+='<div class="card"><b>วันหยุดที่ใช้เดือนนี้</b>'+['SPK','TWN'].map(function(b){
     var list=S.staff.filter(function(s){return s.branch===b}); if(!list.length)return '';
     return '<div class="brow"><span class="bl">'+b+'</span>'+list.map(function(s){var c=calc(s,S.ym);return '<span>'+esc(s.name)+' <b>'+c.off+' / '+c.allowance+'</b></span>'}).join('')+'</div>'}).join('')+'</div>';
@@ -847,7 +861,9 @@ function vSchedCal(){
     var sopts=[['auto','อัตโนมัติ'+(mt1?' · '+mt1.name:' · ไม่มีคู่')]].concat(S.staff.filter(function(x){return x.id!==ps.id&&(!mt1||x.id!==mt1.id)}).map(function(x){return [x.id,x.name+' ('+x.branch+')']})).concat([['none','ไม่มี OT']]);
     h+='<div class="card"><b>วันหยุดของ '+esc(ps.name)+' เดือนนี้</b>'+(mine2.length?'<div class="note">เลือกคนทำแทน (ได้ OT) ของแต่ละวันได้ที่ช่องด้านขวา</div>'+mine2.map(function(o){
       var cur=o.coverId||'auto';
-      return '<div class="item"><span>'+esc(dateShort(o.date))+(o.status==='pending'?' <span class="pill warn">รออนุมัติ</span>':'')+'</span><select aria-label="ผู้ทำแทน '+esc(dateShort(o.date))+'" data-chg="cover" data-k="'+esc(o.id)+'" style="width:auto;max-width:62%">'+sopts.map(function(c){return '<option value="'+esc(c[0])+'"'+(cur===c[0]?' selected':'')+'>'+esc(c[1])+'</option>'}).join('')+'</select></div>'}).join(''):'<div class="sub">ยังไม่มี</div>')+'</div>';
+      var hcur=o.helpId||'',hopts=[['','ไม่โยก']].concat(S.staff.filter(function(x){return x.branch!==ps.branch}).map(function(x){return [x.id,x.name+' ('+x.branch+')']}));
+      return '<div class="item" style="flex-wrap:wrap"><span>'+esc(dateShort(o.date))+(o.status==='pending'?' <span class="pill warn">รออนุมัติ</span>':'')+'</span><select aria-label="ผู้ทำแทน '+esc(dateShort(o.date))+'" data-chg="cover" data-k="'+esc(o.id)+'" style="width:auto;max-width:62%">'+sopts.map(function(c){return '<option value="'+esc(c[0])+'"'+(cur===c[0]?' selected':'')+'>'+esc(c[1])+'</option>'}).join('')+'</select>'
+        +'<div style="width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="sub">โยกมาช่วย 10:00–21:00 (ไม่ได้ OT)</span><select aria-label="โยกมาช่วย '+esc(dateShort(o.date))+'" data-chg="help" data-k="'+esc(o.id)+'" style="width:auto;max-width:55%">'+hopts.map(function(c){return '<option value="'+esc(c[0])+'"'+(hcur===c[0]?' selected':'')+'>'+esc(c[1])+'</option>'}).join('')+'</select></div></div>'}).join(''):'<div class="sub">ยังไม่มี</div>')+'</div>';
   }
   return h;
 }
@@ -897,6 +913,9 @@ function vSchedList(){
         if(o.status==='approved'){cls='c x';txt=(cs?'<b>OT '+esc(cs.name)+'</b>'+(cs.branch!==b?' <span class="sub">('+esc(cs.branch)+')</span>':'')+' ทำทั้งวัน':'ไม่มี OT')+'<br><span class="sub">'+esc(s.name)+' หยุด</span>'}
         else if(o.status==='pending')extra+='<br><span class="pill warn">'+esc(s.name)+' ขอหยุด</span>';
       });
+      S.off.forEach(function(o){if(o.date!==ds||o.status!=='approved')return;var hp=helpOf(o);if(!hp)return;var os=staffById(o.staffId),m2=staffById(helpOT(o));
+        if(os&&os.branch===b)extra+='<br><span class="sub">↗ '+esc(hp.name)+' โยกมาช่วยจาก '+esc(hp.branch)+' ('+esc(helpHours(o))+') ไม่ได้ OT</span>';
+        if(hp.branch===b&&m2){cls='c x';extra+='<br><b>OT '+esc(m2.name)+'</b> ทำทั้งวัน <span class="sub">('+esc(hp.name)+' โยกไป '+esc(os?os.branch:'')+')</span>'}});
       h+='<div class="'+cls+'">'+(txt==='ปกติ'?'<span class="sub">ปกติ</span>':txt)+extra+'</div>';
     });
     h+='</div>';
@@ -1204,6 +1223,7 @@ document.addEventListener('click',function(e){
     case 'reqoff':{
       var st=me(); if(!st)break; var mate=mateOf(st), mo=mate&&offOf(mate.id,d.d);
       var bk0=blockedOn(d.d);if(bk0){toast('วันนี้ห้ามหยุด'+(bk0.note?' ('+bk0.note+')':'')+' ขอหยุดไม่ได้');break}
+      if(helpingOn(st.id,d.d)){toast('วันนี้คุณถูกโยกไปช่วยอีกสาขา ขอหยุดไม่ได้');break}
       var tk=takenBy(st.id,d.d);if(tk){var tks=staffById(tk.staffId);toast((tks?tks.name:'มีพนักงานอีกคน')+' ได้หยุดวันนี้แล้ว ขอหยุดไม่ได้');break}
       if(mo){toast(mate.name+' หยุดวันนี้อยู่แล้ว');break}
       save('dayoffs/'+idFor(d.d,st.id),{staffId:st.id,date:d.d,status:'pending',at:Date.now()}).then(function(){toast('ส่งคำขอหยุดแล้ว รอผู้จัดการอนุมัติ')});
@@ -1334,6 +1354,13 @@ document.addEventListener('change',function(e){
     var o=Object.assign({},C());o[f]=v;save('settings/config',o)}
   else if(k==='adj')patchPay(S.ym,id,{allowAdj:Math.round(Number(t.value)||0)});
   else if(k==='cover'){var od=S.off.find(function(x){return x.id===t.dataset.k});if(!od)return;var b2=Object.assign({},od);delete b2.id;if(t.value==='auto')delete b2.coverId;else b2.coverId=t.value;save('dayoffs/'+od.id,b2).then(function(){toast('เปลี่ยนผู้ทำแทนแล้ว')})}
+  else if(k==='help'){var oh=S.off.find(function(x){return x.id===t.dataset.k});if(!oh)return;var b3=Object.assign({},oh);delete b3.id;
+    if(!t.value){delete b3.helpId;delete b3.helpStart;delete b3.helpEnd}
+    else{var hs=staffById(t.value);if(!hs)return;var hoff=offOf(hs.id,oh.date);
+      if(hoff&&hoff.status==='approved'){toast(hs.name+' หยุดวันนี้อยู่ โยกไม่ได้');render();return}
+      var hm=mateOf(hs),hmo=hm&&offOf(hm.id,oh.date);
+      b3.helpId=hs.id;b3.helpStart='10:00';b3.helpEnd='21:00'}
+    save('dayoffs/'+oh.id,b3).then(function(){toast(t.value?'โยก '+staffById(t.value).name+' มาช่วยแล้ว'+(hm?' · '+hm.name+' ทำทั้งวัน ได้ OT'+(hmo&&hmo.status==='approved'?' (แต่ '+hm.name+' หยุดวันนี้ ไม่ได้ OT)':''):''):'ยกเลิกการโยกแล้ว')})}
   else if(k==='plan'){var o2=Object.assign({},C());o2.mouPlan=Object.assign({},o2.mouPlan);o2.mouPlan[f]=Math.max(0,Number(t.value)||0);save('settings/config',o2)}
   else if(k==='staff'){var s=staffById(id);if(!s)return;var v2=t.value;
     if(f==='base'||f==='mouTotal'||f==='mouPaid')v2=Math.max(0,Number(v2)||0);
