@@ -105,6 +105,11 @@ body{overflow-x:clip}
 .cal button .t{font-size:.6875rem;line-height:1.2;text-align:center}
 .cal button.off{background:var(--off);color:var(--muted)}
 .cal button.pending{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.cal button.taken{background:repeating-linear-gradient(135deg,#ece6dc 0 6px,#e2dacd 6px 12px);color:#8a7f70;border-color:#d8cfbf}
+.legend .tk{background:repeating-linear-gradient(135deg,#ece6dc 0 4px,#d8cfbf 4px 8px)}
+.cal button.blk{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
+.cal button.blk.sel{background:var(--accent);color:var(--accent-ink)}
+.legend .bk{background:var(--bad-soft);border-color:var(--bad)}
 .cal button.cover{background:var(--ok-soft);color:var(--ok)}
 .cal button.rejected{background:var(--bad-soft);color:var(--bad)}
 /* today = rust ring + rust number; selected = solid orange fill. They never look alike. */
@@ -345,7 +350,7 @@ function bahtText(n){n=Math.round(n);var a=Math.abs(n);return (n<0?'ลบ':'')+
 function toast(msg){$toast.textContent=msg;$toast.hidden=false;clearTimeout(tt);tt=setTimeout(function(){$toast.hidden=true},3200)}
 
 /* ---------- data access ---------- */
-function C(){return Object.assign({allowance:4,extraRate:400,mistakeRate:50,otRate:100,mouPlan:{},carryFrom:'2026-09',advFrom:15,advMax:3000},S.cfg||{})}
+function C(){return Object.assign({allowance:4,extraRate:400,mistakeRate:50,otRate:100,mouPlan:{},carryFrom:'2026-09',advFrom:15,advMax:3000,blocked:{}},S.cfg||{})}
 function me(){return S.staff.find(function(s){return S.session&&s.id===S.session.id})}
 function coverOf(o){
   var st=staffById(o.staffId); if(!st||o.coverId==='none')return null;
@@ -354,6 +359,25 @@ function coverOf(o){
 }
 function coveredOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.status==='approved'&&coverOf(o)===sid})}
 function mateOf(st){return S.staff.find(function(s){return s.branch===st.branch&&s.id!==st.id})}
+function takenBy(sid,date){return S.off.find(function(o){return o.staffId!==sid&&o.date===date&&o.status==='approved'})}
+function blockedOn(ds){var b=C().blocked||{};return Object.prototype.hasOwnProperty.call(b,ds)?{note:b[ds]||''}:null}
+function offersOn(ds){return S.off.filter(function(o){return o.date===ds&&o.status!=='rejected'})}
+function blockCard(){
+  var c=C(), bl=c.blocked||{}, mode=S.bmode||'one', p=S.ym.split('-').map(Number), y=p[0], m=p[1]-1, days=new Date(y,m+1,0).getDate(), first=new Date(y,m,1).getDay(), today=todayStr();
+  var h='<section class="card"><h3>วันห้ามหยุด</h3><div class="sub">วันที่ตั้งไว้ พนักงานทุกคนจะขอหยุดไม่ได้ (ผู้จัดการยังบันทึกหรืออนุมัติเองได้)</div>'
+    +'<div class="picks one" role="group" aria-label="วิธีเลือกวัน"><button type="button" data-act="bmode" data-m="one" aria-pressed="'+(mode==='one')+'">ทีละวัน</button><button type="button" data-act="bmode" data-m="range" aria-pressed="'+(mode==='range')+'">เป็นช่วง</button></div>'
+    +'<div class="fld full"><label for="bn">หมายเหตุที่พนักงานจะเห็น (ไม่ใส่ก็ได้)</label><input id="bn" type="text" maxlength="40" placeholder="เช่น ผู้จัดการไม่อยู่" value="'+esc(S.bnote||'')+'" data-chg="bnote"></div>'
+    +navHtml()+'<div class="cal mini">'+TH_DS.map(function(x){return '<div class="dw">'+x+'</div>'}).join('');
+  for(var i=0;i<first;i++)h+='<div class="blank"></div>';
+  for(var d=1;d<=days;d++){var ds=dstr(y,m,d), isb=Object.prototype.hasOwnProperty.call(bl,ds), st=(mode==='range'&&S.brs===ds);
+    h+='<button type="button" class="'+(isb?'blk ':'')+(ds===today?'today ':'')+(st?'sel':'')+'" data-act="bday" data-d="'+ds+'" aria-pressed="'+(isb||st)+'"><span class="d">'+d+'</span>'+(isb?'<span class="t">ห้าม</span>':'')+'</button>'}
+  h+='</div><div class="note">'+(mode==='range'?(S.brs?'เริ่ม '+esc(dateShort(S.brs))+' · แตะวันสุดท้ายของช่วง (แตะวันเริ่มซ้ำเพื่อยกเลิก)':'แตะวันเริ่มต้น แล้วแตะวันสุดท้ายของช่วง'):'แตะวันที่เพื่อห้ามหยุด แตะอีกครั้งเพื่อยกเลิก')+'</div>';
+  var ks=Object.keys(bl).filter(function(k){return k>=today}).sort();
+  if(ks.length){h+='<div class="mlist">'+ks.map(function(k){var ofs=offersOn(k).map(function(o){var q=staffById(o.staffId);return q?q.name:''}).filter(Boolean);
+    return '<div class="item"><span><b>'+esc(dateShort(k))+'</b>'+(bl[k]?' · '+esc(bl[k]):'')+(ofs.length?' <span class="pill warn">มีคนหยุด: '+esc(ofs.join(', '))+'</span>':'')+'</span><button class="btn alt sm" data-act="bdel" data-d="'+k+'" aria-label="ยกเลิกวันห้ามหยุด">ยกเลิก</button></div>'}).join('')+'</div>'}
+  else h+='<div class="note">ยังไม่มีวันห้ามหยุดที่จะมาถึง</div>';
+  return h+'</section>';
+}
 function offOf(sid,date){return S.off.find(function(o){return o.staffId===sid&&o.date===date})}
 function staffById(id){return S.staff.find(function(s){return s.id===id})}
 function coverHours(a,b){var s=[a.start,b.start].sort()[0],e=[a.end,b.end].sort().slice(-1)[0];return s+'–'+e}
@@ -567,10 +591,12 @@ function vCal(st){
     var ds=dstr(y,m,d), mine=offOf(st.id,ds), cls='', tx='';
     if(mine){cls=mine.status==='approved'?'off':mine.status==='pending'?'pending':'rejected';tx=mine.status==='approved'?'หยุด':mine.status==='pending'?'รออนุมัติ':'ไม่ผ่าน'}
     else if(coveredOn(st.id,ds)){cls='cover';tx='OT'}
+    else if(blockedOn(ds)&&ds>=today){cls='blk';tx='ห้าม'}
+    else if(takenBy(st.id,ds)&&ds>=today){cls='taken';tx='เต็ม'}
     if(!tx&&ds===today)tx='วันนี้';
     h+='<button class="'+cls+(ds===today?' today':'')+(ds===S.sel?' sel':'')+'" data-act="seldate" data-d="'+ds+'"><span class="d">'+d+'</span><span class="t">'+tx+'</span></button>';
   }
-  h+='</div><div class="legend"><span><i style="border:2px solid var(--brand2)"></i>วันนี้</span><span><i style="background:var(--accent);border-color:var(--accent)"></i>วันที่เลือก</span><span><i style="background:var(--off)"></i>หยุด</span><span><i style="background:var(--warn-soft)"></i>รออนุมัติ</span><span><i style="background:var(--ok-soft)"></i>OT (ทำแทน)</span></div>';
+  h+='</div><div class="legend"><span><i style="border:2px solid var(--brand2)"></i>วันนี้</span><span><i style="background:var(--accent);border-color:var(--accent)"></i>วันที่เลือก</span><span><i style="background:var(--off)"></i>หยุด</span><span><i style="background:var(--warn-soft)"></i>รออนุมัติ</span><span><i style="background:var(--ok-soft)"></i>OT (ทำแทน)</span><span><i class="tk"></i>เต็ม (มีคนหยุดแล้ว)</span><span><i class="bk"></i>ห้ามหยุด</span></div>';
   var c=calc(st,S.ym);
   h+='<div class="card"><div class="row" style="justify-content:space-between"><span>หยุดแล้วเดือนนี้</span><b>'+c.off+' / '+c.allowance+' วัน</b></div>'+((c.ai.carry+c.ai.adj)<0?'<div class="note">สิทธิ์เดือนนี้เหลือ '+c.ai.eff+' วัน เพราะหยุดเกินสิทธิ์ก่อนหน้า</div>':'')+'<div class="row" style="justify-content:space-between"><span>OT ทำแทนเดือนนี้</span><b>'+c.coverDays+' วัน · ฿'+fmt(c.coverAmt)+'</b></div></div>';
   if(S.sel&&S.sel.indexOf(S.ym)===0){
@@ -584,6 +610,8 @@ function vCal(st){
     var acts='';
     if(!past){
       if(mine2&&(mine2.status==='pending'||mine2.status==='approved'))acts='<button class="btn alt" data-act="canceloff" data-d="'+ds2+'">ยกเลิกวันหยุด</button>';
+      else if(blockedOn(ds2)){var bo=blockedOn(ds2);body+='<div class="note"><b>วันนี้ห้ามหยุด</b>'+(bo.note?' · '+esc(bo.note):'')+' จึงขอหยุดไม่ได้ เลือกวันอื่น หรือติดต่อผู้จัดการ</div>'}
+      else if(takenBy(st.id,ds2)){var tb=takenBy(st.id,ds2),tbs=staffById(tb.staffId);body+='<div class="note">'+esc(tbs?tbs.name:'พนักงานอีกคน')+' ได้หยุดวันนี้แล้ว จึงขอหยุดไม่ได้ เลือกวันอื่น</div>'}
       else if(mo2)body+='<div class="note">'+esc(mate.name)+(mo2.status==='approved'?' ได้หยุดวันนี้แล้ว':' ขอหยุดวันนี้ไว้แล้ว')+' จึงขอหยุดซ้ำไม่ได้</div>';
       else acts='<button class="btn" data-act="reqoff" data-d="'+ds2+'">ขอหยุดวันนี้</button>';
     }
@@ -1022,6 +1050,7 @@ function vSet(){
     +'<div class="fld"><label for="c-am">เบิกล่วงหน้าสูงสุดต่อเดือน (บาท)</label><input id="c-am" type="number" inputmode="numeric" min="0" value="'+c.advMax+'" data-chg="cfg" data-f="advMax"></div>'
     +'</div>'
     +'<div class="note">ค่าวันพิเศษ = (สิทธิ์วันหยุด − วันที่หยุดจริง) × อัตรา ถ้าหยุดครบสิทธิ์จะไม่มี<br>ถ้าหยุดเกินสิทธิ์ ระบบลดสิทธิ์เดือนถัดไปให้เอง (เริ่มนับจากกันยายน 2569) และปรับเองรายเดือนได้ที่หน้าเงินเดือน</div></section>';
+  h+=blockCard();
   var plan=c.mouPlan||{}, pk=Object.keys(plan).sort();
   h+='<section class="card"><h3>แผนหักค่า MOU ต่อเดือน</h3><div class="two">'+(pk.length?pk.map(function(k){var p=k.split('-');return '<div class="fld"><label for="pl-'+k+'">'+esc(TH_M[+p[1]-1]+' '+(+p[0]+543))+' (บาท)</label><input id="pl-'+k+'" type="number" inputmode="numeric" min="0" value="'+(+plan[k]||0)+'" data-chg="plan" data-f="'+k+'"></div>'}).join(''):'<div class="note">ยังไม่มีแผน</div>')+'</div><div class="note">แต่ละเดือนระบบจะเสนอยอดหักตามแผนนี้ ไม่เกินยอดคงเหลือ แล้วคุณกดอนุมัติที่หน้าเงินเดือน</div></section>';
   S.staff.forEach(function(s){var id=esc(s.id);
@@ -1174,12 +1203,15 @@ document.addEventListener('click',function(e){
     case 'unmark':del('dayoffs/'+idFor(d.d,d.id)).then(function(){toast('ยกเลิกวันหยุดแล้ว')});break;
     case 'reqoff':{
       var st=me(); if(!st)break; var mate=mateOf(st), mo=mate&&offOf(mate.id,d.d);
+      var bk0=blockedOn(d.d);if(bk0){toast('วันนี้ห้ามหยุด'+(bk0.note?' ('+bk0.note+')':'')+' ขอหยุดไม่ได้');break}
+      var tk=takenBy(st.id,d.d);if(tk){var tks=staffById(tk.staffId);toast((tks?tks.name:'มีพนักงานอีกคน')+' ได้หยุดวันนี้แล้ว ขอหยุดไม่ได้');break}
       if(mo){toast(mate.name+' หยุดวันนี้อยู่แล้ว');break}
       save('dayoffs/'+idFor(d.d,st.id),{staffId:st.id,date:d.d,status:'pending',at:Date.now()}).then(function(){toast('ส่งคำขอหยุดแล้ว รอผู้จัดการอนุมัติ')});
       break}
     case 'canceloff':{var st2=me();if(st2)del('dayoffs/'+idFor(d.d,st2.id)).then(function(){toast('ยกเลิกแล้ว')});break}
     case 'approve':{
       var o=S.off.find(function(x){return x.id===d.k}); if(!o)break; var s3=staffById(o.staffId), m3=s3&&mateOf(s3), mo3=m3&&offOf(m3.id,o.date);
+      var tk3=takenBy(o.staffId,o.date);if(tk3){var tn3=staffById(tk3.staffId);toast((tn3?tn3.name:'พนักงานอีกคน')+' ได้หยุดวันนี้แล้ว อนุมัติซ้ำไม่ได้');break}
       if(mo3&&mo3.status==='approved'){toast(m3.name+' ได้หยุดวันนี้แล้ว อนุมัติซ้ำไม่ได้');break}
       save('dayoffs/'+o.id,Object.assign({},o,{status:'approved',decidedAt:Date.now()})).then(function(){toast('อนุมัติแล้ว')});break}
     case 'reject':{var o2=S.off.find(function(x){return x.id===d.k});if(o2)save('dayoffs/'+o2.id,Object.assign({},o2,{status:'rejected',decidedAt:Date.now()})).then(function(){toast('ไม่อนุมัติ')});break}
@@ -1190,6 +1222,18 @@ document.addEventListener('click',function(e){
       lb.addEventListener('click',function(ev){if(ev.target.tagName!=='IMG'&&ev.target.tagName!=='IFRAME')closeLb()});
       document.body.appendChild(lb);document.getElementById('lb-x').focus();break}
     case 'paystaff':S.paystaff=d.id;render();break;
+    case 'bmode':S.bmode=d.m;S.brs=null;render();break
+    case 'bday':{var bnEl=document.getElementById('bn');if(bnEl)S.bnote=bnEl.value;var note=(S.bnote||'').trim().slice(0,40),cf=Object.assign({},C()),bl2=Object.assign({},cf.blocked||{});
+      if((S.bmode||'one')==='range'){
+        if(!S.brs){S.brs=d.d;render();break}
+        if(S.brs===d.d){S.brs=null;render();break}
+        var a1=S.brs<d.d?S.brs:d.d,b1=S.brs<d.d?d.d:S.brs,cur=new Date(a1+'T00:00:00'),end=new Date(b1+'T00:00:00'),n=0;
+        while(cur<=end&&n<62){bl2[dstr(cur.getFullYear(),cur.getMonth(),cur.getDate())]=note;cur.setDate(cur.getDate()+1);n++}
+        S.brs=null;cf.blocked=bl2;save('settings/config',cf).then(function(){toast('ห้ามหยุด '+n+' วัน แล้ว')});break}
+      var was=Object.prototype.hasOwnProperty.call(bl2,d.d);
+      if(was)delete bl2[d.d];else bl2[d.d]=note;
+      cf.blocked=bl2;save('settings/config',cf).then(function(){if(was)toast('ยกเลิกวันห้ามหยุดแล้ว');else{var ofs=offersOn(d.d).map(function(o){var q=staffById(o.staffId);return q?q.name:''}).filter(Boolean);toast(ofs.length?'ตั้งแล้ว แต่ '+ofs.join(', ')+' มีคำขอ/ได้หยุดวันนี้อยู่ ตรวจสอบด้วย':'ตั้งวันห้ามหยุดแล้ว')}});break}
+    case 'bdel':{var cf2=Object.assign({},C()),bl3=Object.assign({},cf2.blocked||{});delete bl3[d.d];cf2.blocked=bl3;save('settings/config',cf2).then(function(){toast('ยกเลิกวันห้ามหยุดแล้ว')});break}
     case 'advdate':S.adate=d.d;S.aamt=S.aamt||{};document.querySelectorAll('[id^="aa-"]').forEach(function(i){S.aamt[i.id.slice(3)]=i.value});render();break;
     case 'advpick':S.apick=Number(d.v);render();break;
     case 'advreq':{
@@ -1284,6 +1328,7 @@ document.addEventListener('change',function(e){
     ASSETS.upload(fl,id).then(function(r){var pp=S.pay[S.ym+'_'+id]||{};
       return patchPay(S.ym,id,{proofs:(pp.proofs||[]).concat([{id:r.id,type:r.contentType,at:Date.now()}])})}).then(function(){toast('แนบสลิปโอนเงินแล้ว')}).catch(function(e){
       toast(e&&e.code==='too_large'?'ไฟล์ใหญ่เกินไป (สูงสุด 20 MB)':e&&e.code==='unsupported_type'?'รองรับเฉพาะรูปภาพหรือ PDF':'อัปโหลดไม่สำเร็จ ลองอีกครั้ง')});return}
+  if(k==='bnote'){S.bnote=t.value;return}
   if(k==='ot')patchPay(S.ym,id,{ot:Math.max(0,Number(t.value)||0)});
   else if(k==='cfg'){var v=Math.max(0,Number(t.value)||0);
     var o=Object.assign({},C());o[f]=v;save('settings/config',o)}
