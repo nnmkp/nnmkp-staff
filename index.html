@@ -879,13 +879,33 @@ function vSchedCal(){
   return h;
 }
 
-function toggleOff(sid,ds){
+function askHelp(sid,dsList,cb){
+  var st=staffById(sid); if(!st){cb('');return}
+  var others=S.staff.filter(function(x){return x.branch!==st.branch&&x.id!==sid});
+  if(!others.length){cb('');return}
+  var old=document.getElementById('hq');if(old)old.remove();
+  var el=document.createElement('div');el.className='lb';el.id='hq';el.setAttribute('role','dialog');el.setAttribute('aria-label','เลือกการโยกพนักงาน');
+  var bt='display:block;width:100%;margin:0 0 8px';
+  el.innerHTML='<div class="card" style="width:100%;max-width:420px;margin:0"><h1 style="font-size:1.125rem;margin:0 0 4px">มีการโยกพนักงานมาช่วยไหม?</h1><div class="sub" style="margin-bottom:12px">'+esc(st.name)+' ('+esc(st.branch)+') หยุด '+dsList.map(function(x){return esc(dateShort(x))}).join(', ')+'<br>เลือกก่อน ระบบจะส่งข้อความเข้า LINE ครั้งเดียวหลังจากนี้</div>'
+    +'<button type="button" class="btn" style="'+bt+'" data-h="">ไม่โยก</button>'
+    +others.map(function(x){return '<button type="button" class="btn alt" style="'+bt+'" data-h="'+esc(x.id)+'">โยก '+esc(x.name)+' ('+esc(x.branch)+') มาช่วย 10:00–21:00</button>'}).join('')
+    +'<button type="button" class="btn alt" style="'+bt+';opacity:.7" data-h="__x">ยกเลิก (ยังไม่อนุมัติ)</button></div>';
+  document.body.appendChild(el);
+  el.addEventListener('click',function(ev){var b=ev.target.closest&&ev.target.closest('button[data-h]');if(!b)return;var v=b.getAttribute('data-h');el.remove();if(v!=='__x')cb(v)});
+}
+function applyHelp(body,hid){
+  if(!hid)return body;
+  var hs=staffById(hid);if(!hs)return body;
+  var hoff=offOf(hid,body.date);if(hoff&&hoff.status==='approved'){toast(hs.name+' หยุดวันนี้อยู่ โยกไม่ได้');return body}
+  body.helpId=hid;body.helpStart='10:00';body.helpEnd='21:00';return body}
+function toggleOff(sid,ds,hid){
   var s=staffById(sid); if(!s)return;
   var o=offOf(sid,ds), mate=mateOf(s), mo=mate&&offOf(mate.id,ds);
   if(o&&o.status==='approved'){if(!confirm('ยกเลิกวันหยุดของ '+s.name+' วันที่ '+dateShort(ds)+' ใช่ไหม?\n(OT และการโยกของวันนั้นจะถูกยกเลิกด้วย)'))return;del('dayoffs/'+idFor(ds,sid)).then(function(){toast('ยกเลิกวันหยุด '+s.name+' '+dateShort(ds))});return}
   if(mo&&mo.status!=='rejected'){toast(mate.name+' มีวันหยุดวันนี้แล้ว ลงซ้ำในสาขาเดียวกันไม่ได้');return}
   var body={staffId:sid,date:ds,status:'approved',by:'manager',at:Date.now()};
   if(S.pcover&&S.pcover!=='auto')body.coverId=S.pcover;else if(o&&o.coverId)body.coverId=o.coverId;
+  applyHelp(body,hid);
   save('dayoffs/'+idFor(ds,sid),body).then(function(){toast('บันทึกวันหยุด '+s.name+' '+dateShort(ds))});
 }
 
@@ -1227,12 +1247,12 @@ document.addEventListener('click',function(e){
       if(md&&md.indexOf(S.ym)===0){var po2=offOf(d.id,md);if(!(po2&&po2.status==='approved'))S.pdays=[md]}
       render();break}
     case 'pclear':S.pdays=[];render();break;
-    case 'pconfirm':{var ids=(S.pdays||[]).slice().sort(),sid0=S.pstaff;S.pdays=[];render();ids.forEach(function(ds){toggleOff(sid0,ds)});break}
+    case 'pconfirm':{var ids=(S.pdays||[]).slice().sort(),sid0=S.pstaff;if(!ids.length)break;askHelp(sid0,ids,function(hid){S.pdays=[];render();ids.forEach(function(ds){toggleOff(sid0,ds,hid)})});break}
     case 'sview':S.sview=d.v;render();break;
     case 'mark':{
       var s8=staffById(d.id), m8=s8&&mateOf(s8), mo8=m8&&offOf(m8.id,d.d);
       if(mo8&&mo8.status!=='rejected'){toast(m8.name+' มีวันหยุดวันนี้แล้ว ลงซ้ำในสาขาเดียวกันไม่ได้');break}
-      save('dayoffs/'+idFor(d.d,s8.id),{staffId:s8.id,date:d.d,status:'approved',by:'manager',at:Date.now()}).then(function(){toast('บันทึกวันหยุดให้'+s8.name+'แล้ว')});break}
+      askHelp(s8.id,[d.d],function(hid){var mb={staffId:s8.id,date:d.d,status:'approved',by:'manager',at:Date.now()};applyHelp(mb,hid);save('dayoffs/'+idFor(d.d,s8.id),mb).then(function(){toast('บันทึกวันหยุดให้'+s8.name+'แล้ว')})});break}
     case 'unmark':del('dayoffs/'+idFor(d.d,d.id)).then(function(){toast('ยกเลิกวันหยุดแล้ว')});break;
     case 'reqoff':{
       var st=me(); if(!st)break; var mate=mateOf(st), mo=mate&&offOf(mate.id,d.d);
@@ -1247,7 +1267,7 @@ document.addEventListener('click',function(e){
       var o=S.off.find(function(x){return x.id===d.k}); if(!o)break; var s3=staffById(o.staffId), m3=s3&&mateOf(s3), mo3=m3&&offOf(m3.id,o.date);
       var tk3=takenBy(o.staffId,o.date);if(tk3){var tn3=staffById(tk3.staffId);toast((tn3?tn3.name:'พนักงานอีกคน')+' ได้หยุดวันนี้แล้ว อนุมัติซ้ำไม่ได้');break}
       if(mo3&&mo3.status==='approved'){toast(m3.name+' ได้หยุดวันนี้แล้ว อนุมัติซ้ำไม่ได้');break}
-      save('dayoffs/'+o.id,Object.assign({},o,{status:'approved',decidedAt:Date.now()})).then(function(){toast('อนุมัติแล้ว')});break}
+      askHelp(o.staffId,[o.date],function(hid){var nb=Object.assign({},o,{status:'approved',decidedAt:Date.now()});applyHelp(nb,hid);save('dayoffs/'+o.id,nb).then(function(){toast('อนุมัติแล้ว')})});break}
     case 'reject':{var o2=S.off.find(function(x){return x.id===d.k});if(o2)save('dayoffs/'+o2.id,Object.assign({},o2,{status:'rejected',decidedAt:Date.now()})).then(function(){toast('ไม่อนุมัติ')});break}
     case 'cancelapproved':del('dayoffs/'+d.k).then(function(){toast('ยกเลิกวันหยุดแล้ว')});break;
     case 'viewproof':{closeLb();var lb=document.createElement('div');lb.className='lb';lb.id='lb';lb.setAttribute('role','dialog');lb.setAttribute('aria-label','สลิปโอนเงิน');
