@@ -370,7 +370,7 @@ function coveredOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.s
 function helpingOn(sid,ds){return S.off.find(function(o){return o.date===ds&&o.status==='approved'&&o.helpId===sid&&helpOf(o)})}
 function mateOf(st){return S.staff.find(function(s){return s.branch===st.branch&&s.id!==st.id})}
 function takenBy(sid,date){return S.off.find(function(o){return o.staffId!==sid&&o.date===date&&o.status==='approved'})}
-function blockedOn(ds){var b=C().blocked||{};return Object.prototype.hasOwnProperty.call(b,ds)?{note:b[ds]||''}:null}
+function blockedOn(ds){var b=C().blocked||{};if(Object.prototype.hasOwnProperty.call(b,ds))return {note:b[ds]||''};var wk=new Date(ds+'T00:00:00').getDay();return (wk===0||wk===6)?{note:'เสาร์-อาทิตย์'}:null}
 function offersOn(ds){return S.off.filter(function(o){return o.date===ds&&o.status!=='rejected'})}
 function blockCard(){
   var c=C(), bl=c.blocked||{}, mode=S.bmode||'one', p=S.ym.split('-').map(Number), y=p[0], m=p[1]-1, days=new Date(y,m+1,0).getDate(), first=new Date(y,m,1).getDay(), today=todayStr();
