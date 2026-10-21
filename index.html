@@ -842,11 +842,13 @@ function vSchedCal(){
   var ps=S.pstaff&&staffById(S.pstaff);
   var h='<div class="grp"><h2 style="text-transform:none;letter-spacing:0;font-size:.9375rem;color:var(--fg)">ลงวันหยุดให้ใคร</h2><div class="picks one">'
     +S.staff.map(function(s){return '<button data-act="pstaff" data-id="'+esc(s.id)+'"'+(S.pstaff===s.id?' aria-pressed="true"':'')+'>'+esc(s.name)+'<small>'+esc(s.branch)+'</small></button>'}).join('')+'</div>'
-    +'<div class="note">'+(ps?'กำลังลงวันหยุดให้ <b>'+esc(ps.name)+'</b> · แตะวันที่ได้หลายวัน แตะซ้ำที่วันเดิมเพื่อยกเลิก':(S.msel&&S.msel.indexOf(S.ym)===0?'เลือก <b>'+esc(dateLong(S.msel))+'</b> แล้ว · แตะชื่อด้านบนเพื่อลงวันหยุดวันนี้':'แตะชื่อแล้วแตะวันที่ หรือแตะวันที่ก่อนแล้วแตะชื่อก็ได้'))+'</div></div>';
+    +'<div class="note">'+(ps?'กำลังลงวันหยุดให้ <b>'+esc(ps.name)+'</b> · แตะวันที่เพื่อเลือกได้หลายวัน แล้วกดยืนยัน · แตะวันที่หยุดอยู่แล้วจะถามก่อนยกเลิก':(S.msel&&S.msel.indexOf(S.ym)===0?'เลือก <b>'+esc(dateLong(S.msel))+'</b> แล้ว · แตะชื่อด้านบนเพื่อลงวันหยุดวันนี้':'แตะชื่อแล้วแตะวันที่ หรือแตะวันที่ก่อนแล้วแตะชื่อก็ได้'))+'</div></div>';
   if(ps){
     var mt0=mateOf(ps);
     var copts=[['auto','อัตโนมัติ'+(mt0?' · '+mt0.name:' · ไม่มีคู่')]].concat(S.staff.filter(function(x){return x.id!==ps.id&&(!mt0||x.id!==mt0.id)}).map(function(x){return [x.id,x.name+' '+x.branch]})).concat([['none','ไม่มี OT']]);
     h=h.slice(0,-6)+'<h2 style="text-transform:none;letter-spacing:0;font-size:.9375rem;color:var(--fg);margin-top:6px">ใครทำแทน (ได้ OT)</h2><div class="picks">'+copts.map(function(c){return '<button data-act="pcover" data-id="'+esc(c[0])+'"'+(S.pcover===c[0]?' aria-pressed="true"':'')+'>'+esc(c[1])+'</button>'}).join('')+'</div></div>';
+    var pd=(S.pdays||[]).slice().sort();
+    h+='<div class="card" style="border:2px solid var(--accent)">'+(pd.length?'<div><b>เลือกไว้ '+pd.length+' วัน:</b> '+pd.map(dateShort).map(esc).join(', ')+'</div><div class="row" style="gap:8px;margin-top:8px"><button class="btn" data-act="pconfirm">✅ ยืนยันลงวันหยุดให้ '+esc(ps.name)+'</button><button class="btn alt" data-act="pclear">ล้างที่เลือก</button></div>':'<div class="sub">แตะวันที่ในปฏิทินเพื่อเลือก (ยังไม่บันทึกจนกว่าจะกดยืนยัน)</div>')+'</div>';
   }
   h+='<div class="cal mcal">'+TH_DS.map(function(d){return '<div class="dw">'+d+'</div>'}).join('');
   for(var i=0;i<first;i++)h+='<div class="blank"></div>';
@@ -858,7 +860,7 @@ function vSchedCal(){
       chips+=cc?'<span class="pair">'+oc+cc+'</span>':oc});
     S.off.forEach(function(o){if(o.date!==ds||o.status!=='approved')return;var hp=helpOf(o);if(!hp)return;var m2=staffById(helpOT(o)),os=staffById(o.staffId);
       chips+='<span class="chip help" title="โยกไปช่วย">'+esc(hp.name)+'</span>'+(m2?'<span class="chip ot" title="OT ทำแทน">'+esc(m2.name)+'</span>':'')});
-    h+='<button class="'+(ds===today?'today':'')+(!ps&&ds===S.msel?' sel':'')+(mine?' mine':'')+'" data-act="mseldate" data-d="'+ds+'"><span class="d">'+d+'</span>'+chips+'</button>';
+    h+='<button class="'+(ds===today?'today':'')+((!ps&&ds===S.msel)||(ps&&(S.pdays||[]).indexOf(ds)>=0)?' sel':'')+(mine?' mine':'')+'" data-act="mseldate" data-d="'+ds+'"><span class="d">'+d+'</span>'+chips+'</button>';
   }
   h+='</div><div class="legend"><span><span class="chip spk">SPK</span></span><span><span class="chip twn">TWN</span></span><span><span class="chip spk pend">รออนุมัติ</span></span><span><span class="chip ot">OT ทำแทน</span></span><span><span class="chip help">โยกไปช่วย</span></span></div>';
   h+='<div class="card"><b>วันหยุดที่ใช้เดือนนี้</b>'+['SPK','TWN'].map(function(b){
@@ -880,7 +882,7 @@ function vSchedCal(){
 function toggleOff(sid,ds){
   var s=staffById(sid); if(!s)return;
   var o=offOf(sid,ds), mate=mateOf(s), mo=mate&&offOf(mate.id,ds);
-  if(o&&o.status==='approved'){del('dayoffs/'+idFor(ds,sid)).then(function(){toast('ยกเลิกวันหยุด '+s.name+' '+dateShort(ds))});return}
+  if(o&&o.status==='approved'){if(!confirm('ยกเลิกวันหยุดของ '+s.name+' วันที่ '+dateShort(ds)+' ใช่ไหม?\n(OT และการโยกของวันนั้นจะถูกยกเลิกด้วย)'))return;del('dayoffs/'+idFor(ds,sid)).then(function(){toast('ยกเลิกวันหยุด '+s.name+' '+dateShort(ds))});return}
   if(mo&&mo.status!=='rejected'){toast(mate.name+' มีวันหยุดวันนี้แล้ว ลงซ้ำในสาขาเดียวกันไม่ได้');return}
   var body={staffId:sid,date:ds,status:'approved',by:'manager',at:Date.now()};
   if(S.pcover&&S.pcover!=='auto')body.coverId=S.pcover;else if(o&&o.coverId)body.coverId=o.coverId;
@@ -1217,12 +1219,15 @@ document.addEventListener('click',function(e){
     case 'nopen':S.tab=d.t;S.notif=false;render();break;
     case 'ym':{var p=S.ym.split('-').map(Number);var n=new Date(p[0],p[1]-1+Number(d.d),1);S.ym=n.getFullYear()+'-'+pad(n.getMonth()+1);S.sel=null;S.msel=null;render();break}
     case 'seldate':S.sel=d.d;render();break;
-    case 'mseldate':if(S.pstaff)toggleOff(S.pstaff,d.d);else{S.msel=S.msel===d.d?null:d.d;render()}break;
+    case 'mseldate':if(S.pstaff){var po=offOf(S.pstaff,d.d);if(po&&po.status==='approved')toggleOff(S.pstaff,d.d);else{S.pdays=S.pdays||[];var pi=S.pdays.indexOf(d.d);if(pi>=0)S.pdays.splice(pi,1);else S.pdays.push(d.d);render()}}else{S.msel=S.msel===d.d?null:d.d;render()}break;
     case 'pcover':S.pcover=d.id;render();break;
     case 'pstaff':{
-      if(S.pstaff===d.id){S.pstaff=null;render();break}
-      var md=S.msel;S.pstaff=d.id;S.pcover='auto';S.msel=null;render();
-      if(md&&md.indexOf(S.ym)===0)toggleOff(d.id,md);break}
+      if(S.pstaff===d.id){S.pstaff=null;S.pdays=[];render();break}
+      var md=S.msel;S.pstaff=d.id;S.pcover='auto';S.msel=null;S.pdays=[];
+      if(md&&md.indexOf(S.ym)===0){var po2=offOf(d.id,md);if(!(po2&&po2.status==='approved'))S.pdays=[md]}
+      render();break}
+    case 'pclear':S.pdays=[];render();break;
+    case 'pconfirm':{var ids=(S.pdays||[]).slice().sort(),sid0=S.pstaff;S.pdays=[];render();ids.forEach(function(ds){toggleOff(sid0,ds)});break}
     case 'sview':S.sview=d.v;render();break;
     case 'mark':{
       var s8=staffById(d.id), m8=s8&&mateOf(s8), mo8=m8&&offOf(m8.id,d.d);
